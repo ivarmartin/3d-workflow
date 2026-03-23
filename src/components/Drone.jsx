@@ -18,7 +18,7 @@ function generateLawnmowerPath() {
 
   // Grid extents in local (rotated) frame — along and across the strips
   const halfAlong = 380  // half-length along each strip
-  const halfAcross = 160 // half-width spanning all strips
+  const halfAcross = 195 // half-width spanning all strips (8 passes)
   const numPasses = Math.ceil((halfAcross * 2) / spacing)
 
   const waypoints = []
