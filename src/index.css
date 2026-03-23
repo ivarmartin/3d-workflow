@@ -1,0 +1,36 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+canvas {
+  display: block;
+}
+
+/* Navigation hints — responsive */
+.hints-mobile {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .hints-desktop {
+    display: none;
+  }
+  .hints-mobile {
+    display: inline;
+  }
+  .nav-hints {
+    right: auto !important;
+    left: 28px !important;
+    text-align: left !important;
+    bottom: 68px !important;
+  }
+}
