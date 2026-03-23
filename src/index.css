@@ -29,8 +29,15 @@ canvas {
   }
   .nav-hints {
     right: auto !important;
-    left: 28px !important;
-    text-align: left !important;
-    bottom: 68px !important;
+    left: 50% !important;
+    transform: translateX(-50%);
+    text-align: center !important;
+    bottom: 8px !important;
+  }
+  .stage-nav {
+    bottom: 56px !important;
+  }
+  .stage-info {
+    bottom: 108px !important;
   }
 }

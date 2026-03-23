@@ -59,7 +59,7 @@ export default function StageUI({
   return (
     <>
       {/* Stage info — bottom left */}
-      <div style={{
+      <div className="stage-info" style={{
         position: 'absolute',
         bottom: 80,
         left: 28,
@@ -86,7 +86,7 @@ export default function StageUI({
       </div>
 
       {/* Navigation — bottom center */}
-      <div style={{
+      <div className="stage-nav" style={{
         position: 'absolute',
         bottom: 28,
         left: '50%',
