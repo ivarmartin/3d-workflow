@@ -25,7 +25,7 @@ const SCENE_CENTER = [-30, 4, -22]
 
 const GRAY_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x999999 })
 
-export default function Scene({ visibility, darkMode }) {
+export default function Scene({ visibility, darkMode, onFrustumClick }) {
   const controlsRef = useRef()
   const idleTimerRef = useRef(null)
   const dronePositionRef = useRef(null)
@@ -85,6 +85,7 @@ export default function Scene({ visibility, darkMode }) {
         droneAnimating={visibility.droneAnimating}
         droneHovering={visibility.droneHovering}
         dronePositionRef={dronePositionRef}
+        onFrustumClick={onFrustumClick}
       />
       <FadeModel url={MODELS.map} state={visibility.map} />
       <FadeModel url={MODELS.obliqueCameras} state={visibility.obliqueCameras} overrideMaterial={GRAY_MATERIAL} />

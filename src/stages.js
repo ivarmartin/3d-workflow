@@ -47,7 +47,7 @@ export const TOTAL_STAGES = STAGES.length
 // Values: 'visible', 'fadeIn', 'fadeOut', or undefined (hidden)
 export function getVisibility(stage) {
   return {
-    drone:          stage <= 3,
+    drone:          stage <= 1,
     droneHovering:  stage === 0,
     droneAnimating: stage === 1,
     dronePath:      stage === 1,

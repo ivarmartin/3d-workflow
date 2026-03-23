@@ -6,7 +6,7 @@ import * as THREE from 'three'
 const REVEAL_RADIUS = 5
 const FADE_SPEED = 4 // opacity units per second (fast fade-in once revealed)
 
-export default function NadirCameras({ url, state, droneAnimating, droneHovering, dronePositionRef }) {
+export default function NadirCameras({ url, state, droneAnimating, droneHovering, dronePositionRef, onFrustumClick }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
   const prevHoveringRef = useRef(droneHovering)
@@ -84,8 +84,17 @@ export default function NadirCameras({ url, state, droneAnimating, droneHovering
 
   if (!state && !droneAnimating) return null
 
+  const handleClick = (e) => {
+    if (!onFrustumClick) return
+    e.stopPropagation()
+    const name = e.object?.name
+    if (name && name.startsWith('DJI_')) {
+      onFrustumClick(name)
+    }
+  }
+
   return (
-    <group ref={groupRef} visible={false}>
+    <group ref={groupRef} visible={false} onClick={handleClick}>
       <primitive object={clonedScene} />
     </group>
   )
