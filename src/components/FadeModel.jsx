@@ -5,7 +5,7 @@ import * as THREE from 'three'
 
 const FADE_DURATION = 0.75 // seconds
 
-export default function FadeModel({ url, state, fadeDuration = FADE_DURATION }) {
+export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, overrideMaterial }) {
   // state: 'visible', 'fadeIn', 'fadeOut', or undefined (hidden)
   const { scene } = useGLTF(url)
   const groupRef = useRef()
@@ -17,7 +17,9 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION }) 
     const clone = scene.clone(true)
     clone.traverse((child) => {
       if (child.isMesh) {
-        child.material = child.material.clone()
+        child.material = overrideMaterial
+          ? overrideMaterial.clone()
+          : child.material.clone()
         child.material.transparent = true
         child.material.depthWrite = true
         child.material.opacity = opacityRef.current

@@ -1,6 +1,7 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useCallback } from 'react'
 import { useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
+import * as THREE from 'three'
 import FadeModel from './FadeModel'
 import Drone from './Drone'
 import NadirCameras from './NadirCameras'
@@ -9,9 +10,9 @@ import GroundPlane from './GroundPlane'
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
 
 const MODELS = {
-  nadirCameras: `${ASSET_BASE}260321-Sanda-cameras_nadir.glb`,
+  nadirCameras: `${ASSET_BASE}260321-Sanda-cameras_nadir_2m.glb`,
   map: `${ASSET_BASE}260321-Sanda-2D_map.glb`,
-  obliqueCameras: `${ASSET_BASE}260321-Sanda-cameras_oblique.glb`,
+  obliqueCameras: `${ASSET_BASE}260321-Sanda-cameras_oblique_2m.glb`,
   pointCloud: `${ASSET_BASE}260321-Sanda-pointcloud.glb`,
   mesh: `${ASSET_BASE}260321-Sanda-3D_mesh.glb`,
 }
@@ -21,6 +22,8 @@ Object.values(MODELS).forEach((url) => useGLTF.preload(url))
 
 // Scene center (2D map center)
 const SCENE_CENTER = [-30, 4, -22]
+
+const GRAY_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x999999 })
 
 export default function Scene({ visibility, darkMode }) {
   const controlsRef = useRef()
@@ -73,17 +76,18 @@ export default function Scene({ visibility, darkMode }) {
       <GroundPlane state={visibility.groundPlane} darkMode={darkMode} />
 
       {/* Drone (stages 0-2) */}
-      <Drone visible={visibility.drone} animating={visibility.droneAnimating} positionRef={dronePositionRef} />
+      <Drone visible={visibility.drone} hovering={visibility.droneHovering} animating={visibility.droneAnimating} showPath={visibility.dronePath} positionRef={dronePositionRef} />
 
       {/* Nadir cameras with progressive drone-reveal */}
       <NadirCameras
         url={MODELS.nadirCameras}
         state={visibility.nadirCameras}
         droneAnimating={visibility.droneAnimating}
+        droneHovering={visibility.droneHovering}
         dronePositionRef={dronePositionRef}
       />
       <FadeModel url={MODELS.map} state={visibility.map} />
-      <FadeModel url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
+      <FadeModel url={MODELS.obliqueCameras} state={visibility.obliqueCameras} overrideMaterial={GRAY_MATERIAL} />
       <FadeModel url={MODELS.pointCloud} state={visibility.pointCloud} />
       <FadeModel url={MODELS.mesh} state={visibility.mesh} />
     </>
