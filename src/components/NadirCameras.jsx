@@ -6,9 +6,11 @@ import * as THREE from 'three'
 const REVEAL_RADIUS = 5
 const FADE_SPEED = 4 // opacity units per second (fast fade-in once revealed)
 
-export default function NadirCameras({ url, state, droneAnimating, dronePositionRef }) {
+export default function NadirCameras({ url, state, droneAnimating, droneHovering, dronePositionRef }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
+  const prevHoveringRef = useRef(droneHovering)
+  const prevAnimatingRef = useRef(droneAnimating)
 
   // Clone scene and collect meshes with their world positions
   const { clonedScene, meshes } = useMemo(() => {
@@ -16,10 +18,12 @@ export default function NadirCameras({ url, state, droneAnimating, dronePosition
     const meshList = []
     clone.traverse((child) => {
       if (child.isMesh) {
-        child.material = child.material.clone()
-        child.material.transparent = true
-        child.material.depthWrite = false
-        child.material.opacity = 0
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0x999999,
+          transparent: true,
+          depthWrite: false,
+          opacity: 0,
+        })
         child.visible = false
         meshList.push({ mesh: child, revealed: false, opacity: 0 })
       }
@@ -31,6 +35,23 @@ export default function NadirCameras({ url, state, droneAnimating, dronePosition
   const _pos = useMemo(() => new THREE.Vector3(), [])
 
   useFrame((_, delta) => {
+    // Reset all meshes when returning to hover (stage 0) or restarting flight (stage 1)
+    const shouldReset =
+      (droneHovering && !prevHoveringRef.current) ||
+      (droneAnimating && !prevAnimatingRef.current)
+    if (shouldReset) {
+      for (const entry of meshes) {
+        entry.revealed = false
+        entry.opacity = 0
+        entry.mesh.material.opacity = 0
+        entry.mesh.material.depthWrite = false
+        entry.mesh.visible = false
+      }
+      if (groupRef.current) groupRef.current.visible = false
+    }
+    prevHoveringRef.current = droneHovering
+    prevAnimatingRef.current = droneAnimating
+
     const showAll = state === 'visible' || state === 'fadeIn'
     const revealing = droneAnimating && dronePositionRef?.current
 

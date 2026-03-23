@@ -1,4 +1,23 @@
+import { useState, useEffect, useRef } from 'react'
 import { STAGES } from '../stages'
+
+function useTypewriter(text, speed = 30) {
+  const [displayed, setDisplayed] = useState('')
+  const indexRef = useRef(0)
+
+  useEffect(() => {
+    setDisplayed('')
+    indexRef.current = 0
+    const id = setInterval(() => {
+      indexRef.current++
+      setDisplayed(text.slice(0, indexRef.current))
+      if (indexRef.current >= text.length) clearInterval(id)
+    }, speed)
+    return () => clearInterval(id)
+  }, [text, speed])
+
+  return displayed
+}
 
 export default function StageUI({
   currentStage,
@@ -11,6 +30,7 @@ export default function StageUI({
   splatPlaceholder,
 }) {
   const stage = STAGES[currentStage]
+  const typedDescription = useTypewriter(stage.description)
 
   const btnStyle = {
     padding: '10px 28px',
@@ -60,8 +80,8 @@ export default function StageUI({
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.02em' }}>
           {stage.name}
         </div>
-        <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, maxWidth: 320 }}>
-          {stage.description}
+        <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4, maxWidth: 320, minHeight: 54 }}>
+          {typedDescription}
         </div>
       </div>
 
