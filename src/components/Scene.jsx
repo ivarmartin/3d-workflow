@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import FadeModel from './FadeModel'
 import Drone from './Drone'
+import NadirCameras from './NadirCameras'
 import GroundPlane from './GroundPlane'
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
@@ -24,6 +25,7 @@ const SCENE_CENTER = [-30, 4, -22]
 export default function Scene({ visibility, darkMode }) {
   const controlsRef = useRef()
   const idleTimerRef = useRef(null)
+  const dronePositionRef = useRef(null)
 
   const handleInteractionStart = useCallback(() => {
     if (controlsRef.current) {
@@ -71,10 +73,15 @@ export default function Scene({ visibility, darkMode }) {
       <GroundPlane state={visibility.groundPlane} darkMode={darkMode} />
 
       {/* Drone (stages 0-2) */}
-      <Drone visible={visibility.drone} animating={visibility.droneAnimating} />
+      <Drone visible={visibility.drone} animating={visibility.droneAnimating} positionRef={dronePositionRef} />
 
-      {/* GLB models with fade transitions */}
-      <FadeModel url={MODELS.nadirCameras} state={visibility.nadirCameras} />
+      {/* Nadir cameras with progressive drone-reveal */}
+      <NadirCameras
+        url={MODELS.nadirCameras}
+        state={visibility.nadirCameras}
+        droneAnimating={visibility.droneAnimating}
+        dronePositionRef={dronePositionRef}
+      />
       <FadeModel url={MODELS.map} state={visibility.map} />
       <FadeModel url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
       <FadeModel url={MODELS.pointCloud} state={visibility.pointCloud} />

@@ -50,7 +50,7 @@ function generateLawnmowerPath() {
   return waypoints
 }
 
-export default function Drone({ visible, animating }) {
+export default function Drone({ visible, animating, positionRef }) {
   const meshRef = useRef()
   const progressRef = useRef(0)
   const waypoints = useMemo(() => generateLawnmowerPath(), [])
@@ -80,6 +80,7 @@ export default function Drone({ visible, animating }) {
 
     const point = curve.getPointAt(progressRef.current)
     meshRef.current.position.copy(point)
+    if (positionRef) positionRef.current = point
 
     // Look in direction of travel
     if (progressRef.current < 0.999) {
