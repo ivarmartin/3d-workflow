@@ -8,7 +8,7 @@ import * as THREE from 'three'
 function generateLawnmowerPath() {
   const y = 97
   const spacing = 55 // meters between passes
-  const angle = -50 * (Math.PI / 180) // rotation in radians
+  const angle = -58 * (Math.PI / 180) // rotation in radians
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
 
@@ -18,7 +18,7 @@ function generateLawnmowerPath() {
 
   // Grid extents in local (rotated) frame — along and across the strips
   const halfAlong = 380  // half-length along each strip
-  const halfAcross = 160 // half-width spanning all strips
+  const halfAcross = 195 // half-width spanning all strips (8 passes)
   const numPasses = Math.ceil((halfAcross * 2) / spacing)
 
   const waypoints = []
