@@ -3,27 +3,46 @@ import { useFrame } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
 import * as THREE from 'three'
 
-// Generate a lawnmower grid path covering the 2D map area
-// Map bounds: X -427 to 368, Z -427 to 384, center roughly (-30, -22)
-// We cover nadir camera extent: X -320 to 313, Z -365 to 350
+// Generate a lawnmower grid path rotated to align with the 2D map
+// The map is rotated ~30° clockwise, so the grid follows that angle
 function generateLawnmowerPath() {
-  const xMin = -320
-  const xMax = 313
-  const zMin = -365
-  const zMax = 350
   const y = 97
-  const spacing = 40 // meters between passes
+  const spacing = 35 // meters between passes
+  const angle = -30 * (Math.PI / 180) // map rotation in radians
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+
+  // Center of the map
+  const cx = -30
+  const cz = -22
+
+  // Grid extents in local (rotated) frame — along and across the map
+  const halfAlong = 320  // half-length along the map's long axis
+  const halfAcross = 120 // half-width across the map's short axis
+  const numPasses = Math.ceil((halfAcross * 2) / spacing)
 
   const waypoints = []
   let forward = true
 
-  for (let x = xMin; x <= xMax; x += spacing) {
+  for (let i = 0; i <= numPasses; i++) {
+    const across = -halfAcross + i * spacing
+
+    // Two endpoints of this pass in local frame
+    const localA = { u: across, v: -halfAlong }
+    const localB = { u: across, v: halfAlong }
+
+    // Rotate to world frame
+    const ax = cx + localA.u * cos - localA.v * sin
+    const az = cz + localA.u * sin + localA.v * cos
+    const bx = cx + localB.u * cos - localB.v * sin
+    const bz = cz + localB.u * sin + localB.v * cos
+
     if (forward) {
-      waypoints.push(new THREE.Vector3(x, y, zMin))
-      waypoints.push(new THREE.Vector3(x, y, zMax))
+      waypoints.push(new THREE.Vector3(ax, y, az))
+      waypoints.push(new THREE.Vector3(bx, y, bz))
     } else {
-      waypoints.push(new THREE.Vector3(x, y, zMax))
-      waypoints.push(new THREE.Vector3(x, y, zMin))
+      waypoints.push(new THREE.Vector3(bx, y, bz))
+      waypoints.push(new THREE.Vector3(ax, y, az))
     }
     forward = !forward
   }
