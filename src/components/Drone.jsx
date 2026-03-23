@@ -13,8 +13,8 @@ function generateLawnmowerPath() {
   const sin = Math.sin(angle)
 
   // Center of the camera grid
-  const cx = -10
-  const cz = -20
+  const cx = -30
+  const cz = -10
 
   // Grid extents in local (rotated) frame — along and across the strips
   const halfAlong = 380  // half-length along each strip
