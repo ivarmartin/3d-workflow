@@ -7,17 +7,17 @@ import * as THREE from 'three'
 // Camera strips run ~50° from vertical (upper-left to lower-right)
 function generateLawnmowerPath() {
   const y = 97
-  const spacing = 38 // meters between passes
-  const angle = 137 * (Math.PI / 180) // rotation in radians (180 - 43°)
+  const spacing = 38.2 // meters between passes
+  const angle = 136 * (Math.PI / 180) // rotation in radians (180 - 43°)
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
 
   // Center of the camera grid
-  const cx = -30
-  const cz = -10
+  const cx = -17
+  const cz = -13
 
   // Grid extents in local (rotated) frame — along and across the strips
-  const halfAlong = 380  // half-length along each strip
+  const halfAlong = 375  // half-length along each strip
   const halfAcross = 133 // half-width spanning all strips (8 passes)
   const numPasses = Math.ceil((halfAcross * 2) / spacing)
 
