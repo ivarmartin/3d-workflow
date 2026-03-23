@@ -12,12 +12,12 @@ export const STAGES = [
   {
     id: 2,
     name: 'Camera Placement',
-    description: 'Nadir camera positions captured during the drone survey',
+    description: 'We now have a complete set of images looking down at our landscape, called nadir imagery. The cameras are placed in a grid pattern to ensure good coverage for mapping. You can click on the camera icons to see the actual photos taken at each position.',
   },
   {
     id: 3,
     name: 'Map Reveal',
-    description: '2D orthophoto map generated from nadir imagery',
+    description: 'And from these nadir photos, we can create a map! This is a 2D orthomosaic (like a satellite map) stitched together from the drone images. It provides a detailed view of the landscape from above, but it is flat and lacks depth information. To get 3D structure, we need to add more camera angles.',
   },
   {
     id: 4,
