@@ -8,7 +8,7 @@ import * as THREE from 'three'
 function generateLawnmowerPath() {
   const y = 97
   const spacing = 50 // meters between passes
-  const angle = -63 * (Math.PI / 180) // rotation in radians
+  const angle = -45 * (Math.PI / 180) // rotation in radians
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
 
