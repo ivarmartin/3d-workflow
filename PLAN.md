@@ -8,6 +8,7 @@
 
 ## File Structure
 ```
+├── .github/workflows/deploy.yml  # GitHub Actions → GitHub Pages
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -115,3 +116,13 @@
 ### Step 11: Preload all GLBs
 - useGLTF.preload() calls for all 5 assets on app mount
 - Loading indicator while assets load (drei's <Html> or DOM overlay)
+
+### Step 12: GitHub Pages Deployment
+- vite.config.js: set `base: '/3d-workflow/'` (repo name subdirectory for GitHub Pages)
+- Create `.github/workflows/deploy.yml` — GitHub Actions workflow:
+  - Trigger on push to main
+  - Install deps, run `npm run build`
+  - Vite outputs to `dist/` (built app + public/assets copied automatically by Vite)
+  - Deploy `dist/` to GitHub Pages using `actions/deploy-pages`
+- The `public/` folder is Vite's static asset directory — everything in `public/` (including GLBs) is copied to `dist/` at build time, so the built site serves all assets correctly
+- All asset URLs in code use relative paths (e.g., `assets/260321-Sanda-2D_map.glb`) which Vite resolves against the base path
