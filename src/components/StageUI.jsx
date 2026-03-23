@@ -96,15 +96,13 @@ export default function StageUI({
         gap: 16,
         zIndex: 10,
       }}>
-        {!isFirst && (
-          <button
-            onClick={goBack}
-            disabled={transitioning}
-            style={btnStyle}
-          >
-            Back
-          </button>
-        )}
+        <button
+          onClick={goBack}
+          disabled={isFirst || transitioning}
+          style={{ ...btnStyle, opacity: isFirst ? 0.3 : (transitioning ? 0.5 : 1), cursor: isFirst || transitioning ? 'not-allowed' : 'pointer' }}
+        >
+          Back
+        </button>
 
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -113,15 +111,13 @@ export default function StageUI({
           ))}
         </div>
 
-        {!isLast && (
-          <button
-            onClick={goNext}
-            disabled={transitioning}
-            style={btnStyle}
-          >
-            Next
-          </button>
-        )}
+        <button
+          onClick={goNext}
+          disabled={isLast || transitioning}
+          style={{ ...btnStyle, opacity: isLast ? 0.3 : (transitioning ? 0.5 : 1), cursor: isLast || transitioning ? 'not-allowed' : 'pointer' }}
+        >
+          Next
+        </button>
       </div>
 
       {/* Navigation hints — bottom right (desktop) */}
