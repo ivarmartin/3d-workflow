@@ -53,9 +53,10 @@ export default function NadirCameras({ url, state, droneAnimating, droneHovering
     prevAnimatingRef.current = droneAnimating
 
     const showAll = state === 'visible' || state === 'fadeIn'
+    const fadingOut = state === 'fadeOut'
     const revealing = droneAnimating && dronePositionRef?.current
 
-    if (!showAll && !revealing) return
+    if (!showAll && !revealing && !fadingOut) return
     if (groupRef.current) groupRef.current.visible = true
 
     for (const entry of meshes) {
@@ -72,8 +73,16 @@ export default function NadirCameras({ url, state, droneAnimating, droneHovering
         entry.revealed = true
       }
 
-      // Animate opacity
-      if (entry.revealed && entry.opacity < 1) {
+      if (fadingOut) {
+        // Fade out all visible cameras
+        if (entry.opacity > 0) {
+          entry.opacity = Math.max(0, entry.opacity - delta * FADE_SPEED)
+          entry.mesh.material.opacity = entry.opacity
+          entry.mesh.material.depthWrite = entry.opacity > 0.5
+          entry.mesh.visible = entry.opacity > 0
+        }
+      } else if (entry.revealed && entry.opacity < 1) {
+        // Animate opacity in
         entry.opacity = Math.min(1, entry.opacity + delta * FADE_SPEED)
         entry.mesh.material.opacity = entry.opacity
         entry.mesh.material.depthWrite = entry.opacity > 0.5
