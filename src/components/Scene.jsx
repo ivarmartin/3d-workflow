@@ -44,7 +44,7 @@ const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
 const SPIRAL_END_ELEV = 40       // degrees — end higher
 
 // CameraAnimator — smoothly flies camera for stage transitions
-function CameraAnimator({ controlsRef, currentStage }) {
+function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
   const { camera, size } = useThree()
   const animatingRef = useRef(false)
   const progressRef = useRef(0)
@@ -238,6 +238,7 @@ function CameraAnimator({ controlsRef, currentStage }) {
       if (prevStageRef.current === 6) {
         spiralRef.current = true
         progressRef.current = 0
+        if (onSpiralStart) onSpiralStart()
         return
       }
 
@@ -275,6 +276,29 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   // Fade out nadir cameras after map has fully faded in at stage 3
   const [nadirHidden, setNadirHidden] = useState(false)
   const nadirTimerRef = useRef(null)
+  // Spiral-dependent states: point cloud waits for spiral, oblique cameras fade 5s in
+  const [spiralStarted, setSpiralStarted] = useState(false)
+  const [obliqueFadeOut, setObliqueFadeOut] = useState(false)
+  const obliqueFadeTimerRef = useRef(null)
+
+  const handleSpiralStart = useCallback(() => {
+    setSpiralStarted(true)
+    // 5 seconds into spiral, fade out oblique cameras
+    if (obliqueFadeTimerRef.current) clearTimeout(obliqueFadeTimerRef.current)
+    obliqueFadeTimerRef.current = setTimeout(() => setObliqueFadeOut(true), 5000)
+  }, [])
+
+  // Reset spiral states when leaving stage 6
+  useEffect(() => {
+    if (currentStage !== 6) {
+      setSpiralStarted(false)
+      setObliqueFadeOut(false)
+      if (obliqueFadeTimerRef.current) clearTimeout(obliqueFadeTimerRef.current)
+    }
+    return () => {
+      if (obliqueFadeTimerRef.current) clearTimeout(obliqueFadeTimerRef.current)
+    }
+  }, [currentStage])
 
   useEffect(() => {
     if (currentStage === 3) {
@@ -357,11 +381,11 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         dronePositionRef={dronePositionRef}
         onFrustumClick={onFrustumClick}
       />
-      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 5 : 0.75} />
+      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 2 : 0.75} />
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
-      <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} />
-      <ObliqueDrones url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
-      <PointCloudRevealer url={MODELS.pointCloud} state={visibility.pointCloud} />
+      <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} />
+      <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
+      <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
       <FadeModel url={MODELS.mesh} state={visibility.mesh} />
     </>
   )

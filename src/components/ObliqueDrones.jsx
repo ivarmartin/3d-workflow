@@ -30,7 +30,7 @@ const PASS_CLUSTER_THRESHOLD = 15 // meters — max gap between cameras in same 
 const MIN_PASS_SIZE = 3 // passes with fewer cameras get merged into nearest neighbor
 const PATH_PADDING = 20 // meters — extend path beyond outermost frustums
 
-export default function ObliqueDrones({ url, state }) {
+export default function ObliqueDrones({ url, state, fadeDuration = 2 }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
   const droneRefs = useRef([null, null, null, null])
@@ -268,6 +268,26 @@ export default function ObliqueDrones({ url, state }) {
             cam.mesh.material.depthWrite = cam.mesh.material.opacity > 0.5
           }
         }
+      }
+    } else if (state === 'fadeOut') {
+      // Fade out all camera frustum meshes
+      const speed = 1 / fadeDuration
+      let allGone = true
+      clonedScene.traverse((child) => {
+        if (!child.isMesh) return
+        if (child.material.opacity > 0) {
+          child.material.opacity = Math.max(0, child.material.opacity - delta * speed)
+          child.material.depthWrite = child.material.opacity > 0.5
+          if (child.material.opacity > 0) allGone = false
+        }
+      })
+      // Hide drones too
+      for (let i = 0; i < 4; i++) {
+        const drone = droneRefs.current[i]
+        if (drone) drone.visible = false
+      }
+      if (allGone && groupRef.current) {
+        groupRef.current.visible = false
       }
     }
   })
