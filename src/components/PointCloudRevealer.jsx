@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
-const REVEAL_DURATION = 10 // seconds for all points to appear
+const REVEAL_DURATION = 15 // seconds for all points to appear
 const WHITE_DURATION = 2   // seconds each point stays white before fading to color
 const POINT_SIZE = 2.5     // slightly larger than default
 
@@ -151,10 +151,12 @@ export default function PointCloudRevealer({ url, state }) {
     const mat = materialRef.current
 
     if (state === 'fadeIn') {
-      // Ramp progress 0→1 over REVEAL_DURATION
+      // Ramp progress 0→1 over REVEAL_DURATION with cubic ease-in
+      // Sparse at first, then rapidly accelerating (t³: 12.5% visible at halfway)
       if (progressRef.current < 1) {
         progressRef.current = Math.min(1, progressRef.current + delta / REVEAL_DURATION)
-        mat.uniforms.uProgress.value = progressRef.current
+        const t = progressRef.current
+        mat.uniforms.uProgress.value = t * t * t // cubic ease-in
       }
       // Ramp opacity 0→1 over first 1 second so there's no flash
       if (mat.uniforms.uGlobalOpacity.value < 1) {
