@@ -1,10 +1,11 @@
 import { useRef, useMemo, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
 import * as THREE from 'three'
 
-// Hover position — near the default camera so the drone is prominent on load
-const HOVER_POS = new THREE.Vector3(-30, 200, 250)
+// How far in front of the camera the drone hovers
+const HOVER_DISTANCE = 80
+const HOVER_DROP = 30 // how far below the camera
 
 // Generate a lawnmower grid path rotated to align with the nadir camera strips
 // Camera strips run ~50° from vertical (upper-left to lower-right)
@@ -75,6 +76,10 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const hoverTimeRef = useRef(0)
   const prevAnimatingRef = useRef(false)
   const prevHoveringRef = useRef(hovering)
+  const transitCurveRef = useRef(null)
+  const transitLengthRef = useRef(0)
+
+  const { camera } = useThree()
 
   const waypoints = useMemo(() => generateLawnmowerPath(), [])
 
@@ -85,16 +90,6 @@ export default function Drone({ visible, hovering, animating, showPath, position
 
   // Total path length for speed calculation
   const pathLength = useMemo(() => curve.getLength(), [curve])
-
-  // Smooth curve from hover position to grid start
-  const transitCurve = useMemo(() => {
-    const gridStart = waypoints[0]
-    const mid = new THREE.Vector3().lerpVectors(HOVER_POS, gridStart, 0.5)
-    mid.y = Math.max(HOVER_POS.y, gridStart.y) + 30 // arc upward slightly
-    return new THREE.CatmullRomCurve3([HOVER_POS, mid, gridStart], false, 'catmullrom', 0.5)
-  }, [waypoints])
-
-  const transitLength = useMemo(() => transitCurve.getLength(), [transitCurve])
 
   // Line points for the flight path visualization
   const linePoints = useMemo(() => {
@@ -121,7 +116,13 @@ export default function Drone({ visible, hovering, animating, showPath, position
     // Detect when animating starts
     if (animating && !prevAnimatingRef.current) {
       if (phaseRef.current === 'hover') {
-        // Coming from stage 0 — fly from hover to grid start
+        // Coming from stage 0 — fly from current hover position to grid start
+        const startPos = meshRef.current.position.clone()
+        const gridStart = waypoints[0]
+        const mid = new THREE.Vector3().lerpVectors(startPos, gridStart, 0.5)
+        mid.y = Math.max(startPos.y, gridStart.y) + 30
+        transitCurveRef.current = new THREE.CatmullRomCurve3([startPos, mid, gridStart], false, 'catmullrom', 0.5)
+        transitLengthRef.current = transitCurveRef.current.getLength()
         phaseRef.current = 'transit'
         transitRef.current = 0
       } else {
@@ -140,29 +141,37 @@ export default function Drone({ visible, hovering, animating, showPath, position
     }
 
     if (phaseRef.current === 'hover') {
-      // Gentle bob at hover position
+      // Position drone in front of the camera
       hoverTimeRef.current += delta
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+      const hoverPos = camera.position.clone()
+        .add(dir.multiplyScalar(HOVER_DISTANCE))
+      hoverPos.y -= HOVER_DROP
+      // Gentle bob
       const bobY = Math.sin(hoverTimeRef.current * 1.5) * 3
-      meshRef.current.position.set(HOVER_POS.x, HOVER_POS.y + bobY, HOVER_POS.z)
+      hoverPos.y += bobY
+      meshRef.current.position.copy(hoverPos)
       if (positionRef) positionRef.current = meshRef.current.position
-      // Face toward the scene center (yaw only, stay level)
-      meshRef.current.rotation.set(0, Math.atan2(-(-30 - HOVER_POS.x), -(-22 - HOVER_POS.z)), 0)
+      // Face the camera
+      meshRef.current.lookAt(camera.position)
       return
     }
 
     if (phaseRef.current === 'transit') {
-      transitRef.current += (delta * transitSpeed) / transitLength
+      const tc = transitCurveRef.current
+      if (!tc) return
+      transitRef.current += (delta * transitSpeed) / transitLengthRef.current
       if (transitRef.current >= 1) {
         transitRef.current = 1
         phaseRef.current = 'grid'
         progressRef.current = 0
         setInGrid(true)
       }
-      const point = transitCurve.getPointAt(Math.min(transitRef.current, 1))
+      const point = tc.getPointAt(Math.min(transitRef.current, 1))
       meshRef.current.position.copy(point)
       if (positionRef) positionRef.current = point
       // Look toward direction of travel
-      const ahead = transitCurve.getPointAt(Math.min(transitRef.current + 0.02, 1))
+      const ahead = tc.getPointAt(Math.min(transitRef.current + 0.02, 1))
       meshRef.current.lookAt(ahead)
       return
     }
@@ -200,7 +209,7 @@ export default function Drone({ visible, hovering, animating, showPath, position
         />
       )}
       {/* Drone body + rotors */}
-      <group ref={meshRef} position={HOVER_POS}>
+      <group ref={meshRef}>
         <mesh>
           <boxGeometry args={[6, 3, 10]} />
           <meshStandardMaterial color="#ff6644" emissive="#ff3300" emissiveIntensity={0.3} />
