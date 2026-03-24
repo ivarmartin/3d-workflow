@@ -6,48 +6,11 @@ import * as THREE from 'three'
 // 4 oblique flight directions relative to nadir (136°)
 const FLIGHT_ANGLES = [136, 316, 226, 46] // degrees
 const ALTITUDE = 97
-const SPACING = 38
-const CX = -20
-const CZ = -15
-const HALF_ALONG = 500
-const HALF_ACROSS = 280
 const SPEED = 120 // meters per second
 const REVEAL_DISTANCE = 50 // meters — camera fades in when drone is within this radius
 const CAMERA_FADE_SPEED = 3 // opacity per second
-
-function generateLawnmowerPath(angleDeg) {
-  const y = ALTITUDE
-  const angle = angleDeg * (Math.PI / 180)
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
-
-  const numPasses = Math.ceil((HALF_ACROSS * 2) / SPACING)
-  const waypoints = []
-  let forward = true
-
-  for (let i = 0; i <= numPasses; i++) {
-    const across = -HALF_ACROSS + i * SPACING
-
-    const localA = { u: across, v: -HALF_ALONG }
-    const localB = { u: across, v: HALF_ALONG }
-
-    const ax = CX + localA.u * cos - localA.v * sin
-    const az = CZ + localA.u * sin + localA.v * cos
-    const bx = CX + localB.u * cos - localB.v * sin
-    const bz = CZ + localB.u * sin + localB.v * cos
-
-    if (forward) {
-      waypoints.push(new THREE.Vector3(ax, y, az))
-      waypoints.push(new THREE.Vector3(bx, y, bz))
-    } else {
-      waypoints.push(new THREE.Vector3(bx, y, bz))
-      waypoints.push(new THREE.Vector3(ax, y, az))
-    }
-    forward = !forward
-  }
-
-  return waypoints
-}
+const PASS_CLUSTER_THRESHOLD = 15 // meters — max gap between cameras in same pass
+const PATH_PADDING = 20 // meters — extend path beyond outermost frustums
 
 export default function ObliqueDrones({ url, state }) {
   const { scene } = useGLTF(url)
@@ -55,8 +18,8 @@ export default function ObliqueDrones({ url, state }) {
   const droneRefs = useRef([null, null, null, null])
   const progressRefs = useRef([0, 0, 0, 0])
 
-  // Clone scene and prepare meshes for individual opacity control
-  const { clonedScene, cameraGroups } = useMemo(() => {
+  // Clone scene, group meshes by heading, and derive flight paths from actual positions
+  const { clonedScene, cameraGroups, flights } = useMemo(() => {
     const clone = scene.clone(true)
     clone.updateMatrixWorld(true)
 
@@ -96,19 +59,67 @@ export default function ObliqueDrones({ url, state }) {
       groups[bestIdx].push(d)
     })
 
-    return { clonedScene: clone, cameraGroups: groups }
-  }, [scene])
+    // Derive flight paths from actual frustum positions
+    const flightData = FLIGHT_ANGLES.map((angleDeg, groupIdx) => {
+      const group = groups[groupIdx]
+      const rad = angleDeg * Math.PI / 180
+      const cosA = Math.cos(rad)
+      const sinA = Math.sin(rad)
 
-  // Build curves and line points for each flight
-  const flights = useMemo(() => {
-    return FLIGHT_ANGLES.map((angleDeg) => {
-      const waypoints = generateLawnmowerPath(angleDeg)
+      // Project each frustum into along-track (u) / cross-track (v) coordinates
+      const projected = group.map((d) => ({
+        u: d.pos.x * sinA + d.pos.z * cosA,
+        v: d.pos.x * cosA - d.pos.z * sinA,
+      }))
+
+      // Cluster by v (cross-track) to find passes
+      const sorted = projected.map((p, i) => ({ ...p, i })).sort((a, b) => a.v - b.v)
+      const passes = []
+      let currentPass = [sorted[0]]
+      for (let j = 1; j < sorted.length; j++) {
+        if (sorted[j].v - currentPass[currentPass.length - 1].v > PASS_CLUSTER_THRESHOLD) {
+          passes.push(currentPass)
+          currentPass = [sorted[j]]
+        } else {
+          currentPass.push(sorted[j])
+        }
+      }
+      passes.push(currentPass)
+
+      // Build lawnmower waypoints from real pass positions
+      const waypoints = []
+      let forward = true
+      for (const pass of passes) {
+        const us = pass.map((p) => p.u)
+        const avgV = pass.reduce((sum, p) => sum + p.v, 0) / pass.length
+        const uMin = Math.min(...us) - PATH_PADDING
+        const uMax = Math.max(...us) + PATH_PADDING
+
+        // Convert (u, v) back to world (x, z)
+        // x = u * sin + v * cos, z = u * cos - v * sin
+        const x1 = uMin * sinA + avgV * cosA
+        const z1 = uMin * cosA - avgV * sinA
+        const x2 = uMax * sinA + avgV * cosA
+        const z2 = uMax * cosA - avgV * sinA
+
+        if (forward) {
+          waypoints.push(new THREE.Vector3(x1, ALTITUDE, z1))
+          waypoints.push(new THREE.Vector3(x2, ALTITUDE, z2))
+        } else {
+          waypoints.push(new THREE.Vector3(x2, ALTITUDE, z2))
+          waypoints.push(new THREE.Vector3(x1, ALTITUDE, z1))
+        }
+        forward = !forward
+      }
+
       const curve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.01)
       const pathLength = curve.getLength()
       const linePoints = curve.getPoints(500)
       return { waypoints, curve, pathLength, linePoints }
     })
-  }, [])
+
+    return { clonedScene: clone, cameraGroups: groups, flights: flightData }
+  }, [scene])
 
   // Reset animation when entering fadeIn state
   useEffect(() => {
