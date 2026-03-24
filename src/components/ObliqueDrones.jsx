@@ -9,6 +9,10 @@ const ALTITUDE = 97
 const SPEED = 120 // meters per second
 const REVEAL_DISTANCE = 50 // meters — camera fades in when drone is within this radius
 const CAMERA_FADE_SPEED = 3 // opacity per second
+const ROTOR_SPEED = 25
+const ROTOR_GEO = new THREE.CylinderGeometry(2.5, 2.5, 0.3, 16, 1, false, 0, Math.PI * 0.83)
+const ROTOR_MAT = new THREE.MeshStandardMaterial({ color: '#ff6644', emissive: '#ff3300', emissiveIntensity: 0.3 })
+const ROTOR_OFFSETS = [[4, 1.8, 6], [-4, 1.8, 6], [4, 1.8, -6], [-4, 1.8, -6]]
 const PASS_CLUSTER_THRESHOLD = 15 // meters — max gap between cameras in same pass
 const MIN_PASS_SIZE = 3 // passes with fewer cameras get merged into nearest neighbor
 const PATH_PADDING = 20 // meters — extend path beyond outermost frustums
@@ -17,6 +21,7 @@ export default function ObliqueDrones({ url, state }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
   const droneRefs = useRef([null, null, null, null])
+  const rotorRefs = useRef([[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]])
   const progressRefs = useRef([0, 0, 0, 0])
 
   // Clone scene, group meshes by heading, and derive flight paths from actual positions
@@ -202,6 +207,11 @@ export default function ObliqueDrones({ url, state }) {
           drone.lookAt(ahead)
         }
 
+        // Spin rotors
+        for (const r of rotorRefs.current[i]) {
+          if (r) r.rotation.y += delta * ROTOR_SPEED
+        }
+
         // Reveal cameras near drone (XZ distance only)
         const group = cameraGroups[i]
         for (let j = 0; j < group.length; j++) {
@@ -233,10 +243,21 @@ export default function ObliqueDrones({ url, state }) {
             opacity={0.4}
             transparent
           />
-          <mesh ref={(el) => { droneRefs.current[i] = el }} position={flight.waypoints[0]}>
-            <boxGeometry args={[4, 2, 4]} />
-            <meshStandardMaterial color="#ff6644" emissive="#ff3300" emissiveIntensity={0.3} />
-          </mesh>
+          <group ref={(el) => { droneRefs.current[i] = el }} position={flight.waypoints[0]}>
+            <mesh>
+              <boxGeometry args={[6, 3, 10]} />
+              <meshStandardMaterial color="#ff6644" emissive="#ff3300" emissiveIntensity={0.3} />
+            </mesh>
+            {ROTOR_OFFSETS.map((offset, ri) => (
+              <mesh
+                key={ri}
+                ref={(el) => { rotorRefs.current[i][ri] = el }}
+                position={offset}
+                geometry={ROTOR_GEO}
+                material={ROTOR_MAT}
+              />
+            ))}
+          </group>
         </group>
       ))}
     </group>
