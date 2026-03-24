@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Line, useGLTF } from '@react-three/drei'
+import { Line, Text, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
 // 4 oblique flight directions relative to nadir (136°)
@@ -236,7 +236,15 @@ export default function ObliqueDrones({ url, state }) {
   return (
     <group ref={groupRef}>
       <primitive object={clonedScene} />
-      {state === 'fadeIn' && flights.map((flight, i) => (
+      {state === 'fadeIn' && flights.map((flight, i) => {
+        const p0 = flight.waypoints[0]
+        const p1 = flight.waypoints[1]
+        const mid = new THREE.Vector3().lerpVectors(p0, p1, 0.5)
+        const dir = new THREE.Vector3().subVectors(p1, p0).normalize()
+        const outward = new THREE.Vector3(-dir.z, 0, dir.x)
+        const labelPos = mid.clone().add(outward.multiplyScalar(-45))
+        const yaw = Math.atan2(dir.x, dir.z)
+        return (
         <group key={i}>
           <Line
             points={flight.linePoints}
@@ -245,6 +253,17 @@ export default function ObliqueDrones({ url, state }) {
             opacity={0.4}
             transparent
           />
+          <Text
+            position={[labelPos.x, labelPos.y, labelPos.z]}
+            rotation={[-Math.PI / 2, 0, -yaw]}
+            fontSize={18}
+            color="#66aaff"
+            anchorX="center"
+            anchorY="middle"
+            fillOpacity={0.7}
+          >
+            {`Oblique Mapping Grid ${i + 1}`}
+          </Text>
           <group ref={(el) => { droneRefs.current[i] = el }} position={flight.waypoints[0]}>
             <mesh>
               <boxGeometry args={[6, 3, 10]} />
@@ -261,7 +280,8 @@ export default function ObliqueDrones({ url, state }) {
             ))}
           </group>
         </group>
-      ))}
+        )
+      })}
     </group>
   )
 }
