@@ -10,6 +10,7 @@ const SPEED = 120 // meters per second
 const REVEAL_DISTANCE = 50 // meters — camera fades in when drone is within this radius
 const CAMERA_FADE_SPEED = 3 // opacity per second
 const PASS_CLUSTER_THRESHOLD = 15 // meters — max gap between cameras in same pass
+const MIN_PASS_SIZE = 3 // passes with fewer cameras get merged into nearest neighbor
 const PATH_PADDING = 20 // meters — extend path beyond outermost frustums
 
 export default function ObliqueDrones({ url, state }) {
@@ -74,7 +75,7 @@ export default function ObliqueDrones({ url, state }) {
 
       // Cluster by v (cross-track) to find passes
       const sorted = projected.map((p, i) => ({ ...p, i })).sort((a, b) => a.v - b.v)
-      const passes = []
+      let passes = []
       let currentPass = [sorted[0]]
       for (let j = 1; j < sorted.length; j++) {
         if (sorted[j].v - currentPass[currentPass.length - 1].v > PASS_CLUSTER_THRESHOLD) {
@@ -86,21 +87,53 @@ export default function ObliqueDrones({ url, state }) {
       }
       passes.push(currentPass)
 
-      // Build lawnmower waypoints from real pass positions
+      // Merge small passes (< MIN_PASS_SIZE cameras) into nearest neighbor
+      const merged = []
+      for (const pass of passes) {
+        if (pass.length >= MIN_PASS_SIZE) {
+          merged.push(pass)
+        } else {
+          // Find nearest merged pass by average v
+          const avgV = pass.reduce((s, p) => s + p.v, 0) / pass.length
+          let bestIdx = -1
+          let bestDist = Infinity
+          for (let k = 0; k < merged.length; k++) {
+            const mAvgV = merged[k].reduce((s, p) => s + p.v, 0) / merged[k].length
+            const d = Math.abs(avgV - mAvgV)
+            if (d < bestDist) { bestDist = d; bestIdx = k }
+          }
+          if (bestIdx >= 0) {
+            merged[bestIdx].push(...pass)
+          } else {
+            merged.push(pass) // fallback: keep it if nothing to merge into
+          }
+        }
+      }
+      passes = merged
+
+      // Compute uniform along-track extent across all passes for symmetry
+      let globalUMin = Infinity
+      let globalUMax = -Infinity
+      for (const pass of passes) {
+        for (const p of pass) {
+          if (p.u < globalUMin) globalUMin = p.u
+          if (p.u > globalUMax) globalUMax = p.u
+        }
+      }
+      globalUMin -= PATH_PADDING
+      globalUMax += PATH_PADDING
+
+      // Build lawnmower waypoints with uniform pass length
       const waypoints = []
       let forward = true
       for (const pass of passes) {
-        const us = pass.map((p) => p.u)
         const avgV = pass.reduce((sum, p) => sum + p.v, 0) / pass.length
-        const uMin = Math.min(...us) - PATH_PADDING
-        const uMax = Math.max(...us) + PATH_PADDING
 
         // Convert (u, v) back to world (x, z)
-        // x = u * sin + v * cos, z = u * cos - v * sin
-        const x1 = uMin * sinA + avgV * cosA
-        const z1 = uMin * cosA - avgV * sinA
-        const x2 = uMax * sinA + avgV * cosA
-        const z2 = uMax * cosA - avgV * sinA
+        const x1 = globalUMin * sinA + avgV * cosA
+        const z1 = globalUMin * cosA - avgV * sinA
+        const x2 = globalUMax * sinA + avgV * cosA
+        const z2 = globalUMax * cosA - avgV * sinA
 
         if (forward) {
           waypoints.push(new THREE.Vector3(x1, ALTITUDE, z1))
@@ -112,10 +145,13 @@ export default function ObliqueDrones({ url, state }) {
         forward = !forward
       }
 
-      const curve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.01)
-      const pathLength = curve.getLength()
-      const linePoints = curve.getPoints(500)
-      return { waypoints, curve, pathLength, linePoints }
+      // Use CurvePath of straight LineCurve3 segments for crisp lines
+      const curvePath = new THREE.CurvePath()
+      for (let k = 0; k < waypoints.length - 1; k++) {
+        curvePath.add(new THREE.LineCurve3(waypoints[k], waypoints[k + 1]))
+      }
+      const pathLength = curvePath.getLength()
+      return { waypoints, curve: curvePath, pathLength, linePoints: waypoints }
     })
 
     return { clonedScene: clone, cameraGroups: groups, flights: flightData }
