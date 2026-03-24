@@ -9,7 +9,7 @@ const MAP_HALF_ALONG = 375
 const MAP_HALF_ACROSS = 133
 const MAP_ANGLE = 136 * (Math.PI / 180)
 
-const BAR_LENGTH = 100 // 100 meters
+const BAR_LENGTH = 105 // 105 meters
 const BAR_HEIGHT = 1.5
 const BAR_THICKNESS = 0.5
 const ENDCAP_HEIGHT = 4
@@ -109,7 +109,7 @@ export default function ScaleBar3D({ state }) {
         material-transparent
         material-depthWrite={false}
       >
-        100 m
+        105 m
       </Text>
     </group>
   )

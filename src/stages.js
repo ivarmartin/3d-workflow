@@ -21,21 +21,26 @@ export const STAGES = [
   },
   {
     id: 4,
+    name: 'Map without terrain',
+    description: 'The 2D map we made from the nadir photos is a flat map. While you can sometimes calculate a bit of terrain data from nadir flights, you will never get accurate 3D terrain from these flights alone. To capture the terrain, we need a few more flights - with the drone camera at an angle.',
+  },
+  {
+    id: 5,
     name: 'Oblique Cameras',
     description: 'Additional oblique camera angles for 3D reconstruction',
   },
   {
-    id: 5,
+    id: 6,
     name: 'Point Cloud',
     description: 'Dense 3D point cloud from structure-from-motion',
   },
   {
-    id: 6,
+    id: 7,
     name: 'Mesh',
     description: 'Textured 3D mesh reconstructed from the point cloud',
   },
   {
-    id: 7,
+    id: 8,
     name: 'Gaussian Splat',
     description: 'Gaussian splat rendering — coming soon',
   },
@@ -52,11 +57,12 @@ export function getVisibility(stage) {
     droneAnimating: stage === 1,
     dronePath:      stage === 1,
     groundPlane:    stage <= 2 ? 'visible' : stage === 3 ? 'fadeOut' : undefined,
-    nadirCameras:   stage === 2 ? 'fadeIn' : stage >= 3 ? 'visible' : undefined,
+    // Nadir cameras fade in at stage 2, visible at stage 3 (faded out after map via Scene.jsx), hidden from stage 4+
+    nadirCameras:   stage === 2 ? 'fadeIn' : stage === 3 ? 'visible' : undefined,
     map:            stage === 3 ? 'fadeIn' : stage >= 4 ? 'visible' : undefined,
-    obliqueCameras: stage === 4 ? 'fadeIn' : stage >= 5 ? 'visible' : undefined,
-    pointCloud:     stage === 5 ? 'fadeIn' : stage === 6 ? 'fadeOut' : undefined,
-    mesh:           stage === 6 ? 'fadeIn' : stage >= 7 ? 'visible' : undefined,
-    splatPlaceholder: stage === 7,
+    obliqueCameras: stage === 5 ? 'fadeIn' : stage >= 6 ? 'visible' : undefined,
+    pointCloud:     stage === 6 ? 'fadeIn' : stage === 7 ? 'fadeOut' : undefined,
+    mesh:           stage === 7 ? 'fadeIn' : stage >= 8 ? 'visible' : undefined,
+    splatPlaceholder: stage === 8,
   }
 }

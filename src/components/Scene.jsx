@@ -34,7 +34,7 @@ const MAP_HALF_ACROSS = 133      // half-width along short axis (266m total)
 const MAP_ANGLE_DEG = 136        // rotation of long axis in degrees
 const MAP_ANGLE_RAD = MAP_ANGLE_DEG * (Math.PI / 180)
 
-// CameraAnimator — smoothly flies camera to top-down when entering stage 3
+// CameraAnimator — smoothly flies camera for stage transitions
 function CameraAnimator({ controlsRef, currentStage }) {
   const { camera, size } = useThree()
   const animatingRef = useRef(false)
@@ -44,86 +44,117 @@ function CameraAnimator({ controlsRef, currentStage }) {
   const startTargetRef = useRef(new THREE.Vector3())
   const goalPosRef = useRef(new THREE.Vector3())
   const goalTargetRef = useRef(new THREE.Vector3())
-
-  const ANIM_DURATION = 1.5 // seconds
+  const animDurationRef = useRef(1.5)
+  const postAnimAutoRotateRef = useRef(false)
 
   useEffect(() => {
-    // Trigger animation when entering stage 3
-    if (currentStage === 3 && prevStageRef.current !== 3 && controlsRef.current) {
-      const aspect = size.width / size.height
-      const isPortrait = aspect < 1
+    if (!controlsRef.current) return
+    const prev = prevStageRef.current
+    prevStageRef.current = currentStage
 
-      // Target: look at map center at ground level
-      const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
+    const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
+    const aspect = size.width / size.height
+    const isPortrait = aspect < 1
+    const fovRad = camera.fov * (Math.PI / 180)
+    const cos = Math.cos(MAP_ANGLE_RAD)
+    const sin = Math.sin(MAP_ANGLE_RAD)
 
-      // Compute camera height to fit the map
-      const fovRad = camera.fov * (Math.PI / 180)
+    let goalPos = null
+    let goalTarget = null
+    let duration = 1.5
+    let autoRotateAfter = false
 
-      // In portrait: long axis (750m) must fit vertically
-      // In landscape: long axis (750m) must fit horizontally
+    if (currentStage === 3 && prev !== 3) {
+      // Stage 3: top-down map view
       let fitDimension
       if (isPortrait) {
-        // Vertical FOV covers the long axis; horizontal covers short axis
         const verticalFit = (MAP_HALF_ALONG * 2 * 1.15) / (2 * Math.tan(fovRad / 2))
         const horizontalFit = (MAP_HALF_ACROSS * 2 * 1.15) / (2 * Math.tan(fovRad / 2) * aspect)
         fitDimension = Math.max(verticalFit, horizontalFit)
       } else {
-        // Horizontal FOV covers the long axis; vertical covers short axis
         const horizontalFit = (MAP_HALF_ALONG * 2 * 1.15) / (2 * Math.tan(fovRad / 2) * aspect)
         const verticalFit = (MAP_HALF_ACROSS * 2 * 1.15) / (2 * Math.tan(fovRad / 2))
         fitDimension = Math.max(horizontalFit, verticalFit)
       }
 
-      // Camera goes directly above map center, with a tiny XZ offset
-      // so OrbitControls doesn't gimbal-lock at the pole
-      // The offset direction determines which way is "up" on screen:
-      // we use the map's long-axis direction so it aligns with screen
-      const cos = Math.cos(MAP_ANGLE_RAD)
-      const sin = Math.sin(MAP_ANGLE_RAD)
-
       let offsetX, offsetZ
       if (isPortrait) {
-        // Long axis should be vertical on screen → offset camera along short axis
-        // Short axis is perpendicular to long axis (MAP_ANGLE + 90°)
         offsetX = Math.cos(MAP_ANGLE_RAD + Math.PI / 2) * 0.5
         offsetZ = Math.sin(MAP_ANGLE_RAD + Math.PI / 2) * 0.5
       } else {
-        // Long axis should be horizontal on screen → offset camera along long axis
         offsetX = cos * 0.5
         offsetZ = sin * 0.5
       }
 
-      const goalPos = new THREE.Vector3(
-        target.x + offsetX,
-        fitDimension,
-        target.z + offsetZ
-      )
+      goalPos = new THREE.Vector3(target.x + offsetX, fitDimension, target.z + offsetZ)
+      goalTarget = target.clone()
+      autoRotateAfter = false
 
-      // Save start state
+    } else if (currentStage === 4 && prev !== 4) {
+      // Stage 4: flat plane view — near side-on (~10° elevation) to show map is flat
+      // Camera positioned at low elevation angle along the map's short axis
+      const elevAngle = 10 * (Math.PI / 180) // 10 degrees above horizontal
+      const distance = 1200 // far enough to see the full map as a flat plane
+
+      // Position camera along the short axis (perpendicular to long axis)
+      const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
+      const horizontalDist = distance * Math.cos(elevAngle)
+      const camY = distance * Math.sin(elevAngle)
+
+      goalPos = new THREE.Vector3(
+        target.x + Math.cos(shortAxisAngle) * horizontalDist,
+        camY,
+        target.z + Math.sin(shortAxisAngle) * horizontalDist
+      )
+      goalTarget = target.clone()
+      duration = 2.0
+      autoRotateAfter = true
+
+    } else if (currentStage === 5 && prev !== 5) {
+      // Stage 5: oblique cameras — 45° looking down, zoomed out to see full grids
+      const elevAngle = 45 * (Math.PI / 180)
+      const distance = 1600 // further out to see oblique grids
+
+      // Approach from a direction along the map's short axis
+      const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
+      const horizontalDist = distance * Math.cos(elevAngle)
+      const camY = distance * Math.sin(elevAngle)
+
+      goalPos = new THREE.Vector3(
+        target.x + Math.cos(shortAxisAngle) * horizontalDist,
+        camY,
+        target.z + Math.sin(shortAxisAngle) * horizontalDist
+      )
+      goalTarget = target.clone()
+      duration = 2.0
+      autoRotateAfter = false
+    }
+
+    if (goalPos) {
       startPosRef.current.copy(camera.position)
       startTargetRef.current.copy(controlsRef.current.target)
       goalPosRef.current.copy(goalPos)
-      goalTargetRef.current.copy(target)
+      goalTargetRef.current.copy(goalTarget)
+      animDurationRef.current = duration
+      postAnimAutoRotateRef.current = autoRotateAfter
 
-      // Start animation
       progressRef.current = 0
       animatingRef.current = true
       controlsRef.current.enabled = false
       controlsRef.current.autoRotate = false
     }
-    prevStageRef.current = currentStage
   }, [currentStage, camera, size, controlsRef])
 
   useFrame((_, delta) => {
     if (!animatingRef.current) return
 
-    progressRef.current += delta / ANIM_DURATION
+    progressRef.current += delta / animDurationRef.current
     if (progressRef.current >= 1) {
       progressRef.current = 1
       animatingRef.current = false
       if (controlsRef.current) {
         controlsRef.current.enabled = true
-        controlsRef.current.autoRotate = false
+        controlsRef.current.autoRotate = postAnimAutoRotateRef.current
         controlsRef.current.update()
       }
     }
@@ -152,19 +183,31 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   // Delay map + scale bar fade-in until after camera animation completes
   const [mapReady, setMapReady] = useState(false)
   const mapTimerRef = useRef(null)
+  // Fade out nadir cameras after map has fully faded in at stage 3
+  const [nadirHidden, setNadirHidden] = useState(false)
+  const nadirTimerRef = useRef(null)
 
   useEffect(() => {
     if (currentStage === 3) {
       // Camera animation takes 1.5s; wait an extra 1s before showing the map
       setMapReady(false)
+      setNadirHidden(false)
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
+      if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
       mapTimerRef.current = setTimeout(() => setMapReady(true), 2500)
+      // Nadir fadeout starts after map fade-in completes (2500ms + 750ms fade duration)
+      nadirTimerRef.current = setTimeout(() => setNadirHidden(true), 3250)
     } else {
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
+      if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
       // For stages > 3, show map immediately (it's already loaded)
       setMapReady(currentStage > 3)
+      setNadirHidden(currentStage > 3)
     }
-    return () => { if (mapTimerRef.current) clearTimeout(mapTimerRef.current) }
+    return () => {
+      if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
+      if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
+    }
   }, [currentStage])
 
   const handleInteractionStart = useCallback(() => {
@@ -177,8 +220,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   const handleInteractionEnd = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     idleTimerRef.current = setTimeout(() => {
-      // Don't re-enable autorotate at stage 3 (top-down map view)
-      if (controlsRef.current && currentStageRef.current !== 3) {
+      // Don't re-enable autorotate at stage 3 (top-down map view) or 5 (oblique)
+      if (controlsRef.current && currentStageRef.current !== 3 && currentStageRef.current !== 5) {
         controlsRef.current.autoRotate = true
       }
     }, 5000)
@@ -219,7 +262,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
       {/* Nadir cameras with progressive drone-reveal */}
       <NadirCameras
         url={MODELS.nadirCameras}
-        state={visibility.nadirCameras}
+        state={nadirHidden ? 'fadeOut' : visibility.nadirCameras}
         droneAnimating={visibility.droneAnimating}
         droneHovering={visibility.droneHovering}
         dronePositionRef={dronePositionRef}
