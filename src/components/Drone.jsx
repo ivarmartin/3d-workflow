@@ -90,6 +90,8 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const prevHoveringRef = useRef(hovering)
   const transitCurveRef = useRef(null)
   const transitLengthRef = useRef(0)
+  const [lineOpacity, setLineOpacity] = useState(0)
+  const lineOpacityRef = useRef(0)
 
   const { camera } = useThree()
 
@@ -122,6 +124,8 @@ export default function Drone({ visible, hovering, animating, showPath, position
       transitRef.current = 0
       timeRef.current = 0
       setInGrid(false)
+      lineOpacityRef.current = 0
+      setLineOpacity(0)
     }
     prevHoveringRef.current = hovering
 
@@ -202,6 +206,11 @@ export default function Drone({ visible, hovering, animating, showPath, position
         progressRef.current = 0
         setInGrid(true)
       }
+      // Fade in the grid line during transit
+      if (lineOpacityRef.current < 0.4) {
+        lineOpacityRef.current = Math.min(0.4, lineOpacityRef.current + delta * 0.25)
+        setLineOpacity(lineOpacityRef.current)
+      }
       const point = tc.getPointAt(Math.min(transitRef.current, 1))
       meshRef.current.position.copy(point)
       if (positionRef) positionRef.current = point
@@ -235,13 +244,13 @@ export default function Drone({ visible, hovering, animating, showPath, position
 
   return (
     <group>
-      {/* Flight path line — visible during stages 1-2 */}
-      {showPath && inGrid && (
+      {/* Flight path line — fades in during transit, visible during grid */}
+      {showPath && (inGrid || lineOpacity > 0) && (
         <Line
           points={linePoints}
           color="#66aaff"
           lineWidth={1}
-          opacity={0.4}
+          opacity={inGrid ? 0.4 : lineOpacity}
           transparent
         />
       )}
