@@ -155,8 +155,17 @@ export default function PointCloudRevealer({ url, state }) {
       // Sparse at first, then rapidly accelerating (t³: 12.5% visible at halfway)
       if (progressRef.current < 1) {
         progressRef.current = Math.min(1, progressRef.current + delta / REVEAL_DURATION)
-        const t = progressRef.current
-        mat.uniforms.uProgress.value = t * t * t // cubic ease-in
+      }
+      const t = progressRef.current
+      const easedProgress = t * t * t // cubic ease-in
+
+      // After all points revealed, keep advancing uProgress past 1.0
+      // so the last-revealed points can fully transition from white to color
+      if (easedProgress >= 1) {
+        const whiteExtra = WHITE_DURATION / REVEAL_DURATION
+        mat.uniforms.uProgress.value = Math.min(1 + whiteExtra, mat.uniforms.uProgress.value + delta / REVEAL_DURATION)
+      } else {
+        mat.uniforms.uProgress.value = easedProgress
       }
       // Ramp opacity 0→1 over first 1 second so there's no flash
       if (mat.uniforms.uGlobalOpacity.value < 1) {
