@@ -33,10 +33,12 @@ export default function ObliqueDrones({ url, state }) {
     const meshData = []
     clone.traverse((child) => {
       if (!child.isMesh) return
-      child.material = child.material.clone()
-      child.material.transparent = true
-      child.material.depthWrite = true
-      child.material.opacity = 0
+      child.material = new THREE.MeshStandardMaterial({
+        color: 0x999999,
+        transparent: true,
+        depthWrite: false,
+        opacity: 0,
+      })
 
       const pos = new THREE.Vector3()
       const quat = new THREE.Quaternion()
