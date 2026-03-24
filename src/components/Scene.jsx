@@ -6,6 +6,7 @@ import FadeModel from './FadeModel'
 import Drone from './Drone'
 import NadirCameras from './NadirCameras'
 import ObliqueDrones from './ObliqueDrones'
+import PointCloudRevealer from './PointCloudRevealer'
 import GroundPlane from './GroundPlane'
 import ScaleBar3D from './ScaleBar3D'
 
@@ -34,6 +35,14 @@ const MAP_HALF_ACROSS = 133      // half-width along short axis (266m total)
 const MAP_ANGLE_DEG = 136        // rotation of long axis in degrees
 const MAP_ANGLE_RAD = MAP_ANGLE_DEG * (Math.PI / 180)
 
+// Stage 6 spiral camera config
+const SPIRAL_DURATION = 13       // seconds
+const SPIRAL_ROTATIONS = 3       // full 360° rotations
+const SPIRAL_START_DIST = 300    // start close
+const SPIRAL_END_DIST = 900      // end further out
+const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
+const SPIRAL_END_ELEV = 40       // degrees — end higher
+
 // CameraAnimator — smoothly flies camera for stage transitions
 function CameraAnimator({ controlsRef, currentStage }) {
   const { camera, size } = useThree()
@@ -46,6 +55,8 @@ function CameraAnimator({ controlsRef, currentStage }) {
   const goalTargetRef = useRef(new THREE.Vector3())
   const animDurationRef = useRef(1.5)
   const postAnimAutoRotateRef = useRef(false)
+  const spiralRef = useRef(false)       // true when doing spiral anim
+  const spiralStartAngle = useRef(0)    // starting horizontal angle
 
   useEffect(() => {
     if (!controlsRef.current) return
@@ -63,6 +74,13 @@ function CameraAnimator({ controlsRef, currentStage }) {
     let goalTarget = null
     let duration = 1.5
     let autoRotateAfter = false
+
+    // Stop spiral if leaving stage 6
+    if (prev === 6 && currentStage !== 6 && spiralRef.current) {
+      spiralRef.current = false
+      animatingRef.current = false
+      if (controlsRef.current) controlsRef.current.enabled = true
+    }
 
     if (currentStage === 3 && prev !== 3) {
       // Stage 3: top-down map view
@@ -128,6 +146,28 @@ function CameraAnimator({ controlsRef, currentStage }) {
       goalTarget = target.clone()
       duration = 2.0
       autoRotateAfter = false
+
+    } else if (currentStage === 6 && prev !== 6) {
+      // Stage 6: point cloud — spiral camera outward while points reveal
+      // First, smoothly fly to starting position of spiral, then switch to spiral mode
+      const startElev = SPIRAL_START_ELEV * (Math.PI / 180)
+      const hDist = SPIRAL_START_DIST * Math.cos(startElev)
+      const camY = SPIRAL_START_DIST * Math.sin(startElev)
+
+      // Compute starting angle from current camera position
+      const dx = camera.position.x - target.x
+      const dz = camera.position.z - target.z
+      const currentAngle = Math.atan2(dz, dx)
+      spiralStartAngle.current = currentAngle
+
+      goalPos = new THREE.Vector3(
+        target.x + Math.cos(currentAngle) * hDist,
+        camY,
+        target.z + Math.sin(currentAngle) * hDist
+      )
+      goalTarget = target.clone()
+      duration = 1.5 // fly-in duration before spiral starts
+      autoRotateAfter = false
     }
 
     if (goalPos) {
@@ -146,12 +186,61 @@ function CameraAnimator({ controlsRef, currentStage }) {
   }, [currentStage, camera, size, controlsRef])
 
   useFrame((_, delta) => {
-    if (!animatingRef.current) return
+    if (!animatingRef.current && !spiralRef.current) return
 
+    const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
+
+    // Spiral animation (stage 6)
+    if (spiralRef.current) {
+      progressRef.current += delta / SPIRAL_DURATION
+      if (progressRef.current >= 1) {
+        progressRef.current = 1
+        spiralRef.current = false
+        if (controlsRef.current) {
+          controlsRef.current.enabled = true
+          controlsRef.current.autoRotate = true
+          controlsRef.current.update()
+        }
+        return
+      }
+
+      const t = progressRef.current
+      // Ease out for smooth deceleration
+      const ease = 1 - Math.pow(1 - t, 2)
+
+      const angle = spiralStartAngle.current + ease * SPIRAL_ROTATIONS * Math.PI * 2
+      const dist = SPIRAL_START_DIST + (SPIRAL_END_DIST - SPIRAL_START_DIST) * ease
+      const elevDeg = SPIRAL_START_ELEV + (SPIRAL_END_ELEV - SPIRAL_START_ELEV) * ease
+      const elev = elevDeg * (Math.PI / 180)
+
+      const hDist = dist * Math.cos(elev)
+      const camY = dist * Math.sin(elev)
+
+      camera.position.set(
+        target.x + Math.cos(angle) * hDist,
+        camY,
+        target.z + Math.sin(angle) * hDist
+      )
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(target)
+        controlsRef.current.update()
+      }
+      return
+    }
+
+    // Standard linear animation
     progressRef.current += delta / animDurationRef.current
     if (progressRef.current >= 1) {
       progressRef.current = 1
       animatingRef.current = false
+
+      // If stage 6 fly-in just finished, start the spiral
+      if (prevStageRef.current === 6) {
+        spiralRef.current = true
+        progressRef.current = 0
+        return
+      }
+
       if (controlsRef.current) {
         controlsRef.current.enabled = true
         controlsRef.current.autoRotate = postAnimAutoRotateRef.current
@@ -272,7 +361,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} />
       <ObliqueDrones url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
-      <FadeModel url={MODELS.pointCloud} state={visibility.pointCloud} />
+      <PointCloudRevealer url={MODELS.pointCloud} state={visibility.pointCloud} />
       <FadeModel url={MODELS.mesh} state={visibility.mesh} />
     </>
   )
