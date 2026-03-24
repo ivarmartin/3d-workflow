@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -123,7 +123,7 @@ function CameraAnimator({ controlsRef, currentStage }) {
       animatingRef.current = false
       if (controlsRef.current) {
         controlsRef.current.enabled = true
-        controlsRef.current.autoRotate = true
+        controlsRef.current.autoRotate = false
         controlsRef.current.update()
       }
     }
@@ -146,6 +146,26 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   const controlsRef = useRef()
   const idleTimerRef = useRef(null)
   const dronePositionRef = useRef(null)
+  const currentStageRef = useRef(currentStage)
+  currentStageRef.current = currentStage
+
+  // Delay map + scale bar fade-in until after camera animation completes
+  const [mapReady, setMapReady] = useState(false)
+  const mapTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (currentStage === 3) {
+      // Camera animation takes 1.5s; wait an extra 1s before showing the map
+      setMapReady(false)
+      if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
+      mapTimerRef.current = setTimeout(() => setMapReady(true), 2500)
+    } else {
+      if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
+      // For stages > 3, show map immediately (it's already loaded)
+      setMapReady(currentStage > 3)
+    }
+    return () => { if (mapTimerRef.current) clearTimeout(mapTimerRef.current) }
+  }, [currentStage])
 
   const handleInteractionStart = useCallback(() => {
     if (controlsRef.current) {
@@ -157,7 +177,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   const handleInteractionEnd = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     idleTimerRef.current = setTimeout(() => {
-      if (controlsRef.current) {
+      // Don't re-enable autorotate at stage 3 (top-down map view)
+      if (controlsRef.current && currentStageRef.current !== 3) {
         controlsRef.current.autoRotate = true
       }
     }, 5000)
@@ -204,8 +225,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         dronePositionRef={dronePositionRef}
         onFrustumClick={onFrustumClick}
       />
-      <FadeModel url={MODELS.map} state={visibility.map} />
-      <ScaleBar3D state={visibility.map} />
+      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} />
+      <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} />
       <ObliqueDrones url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
       <FadeModel url={MODELS.pointCloud} state={visibility.pointCloud} />
