@@ -128,28 +128,25 @@ export default function Drone({ visible, hovering, animating, showPath, position
     // Detect when animating starts
     if (animating && !prevAnimatingRef.current) {
       if (phaseRef.current === 'hover') {
-        // Coming from stage 0 — fly sideways first so drone stays in view,
+        // Coming from stage 0 — fly forward (away from camera) into the scene,
         // then curve toward the grid start
         const startPos = meshRef.current.position.clone()
         const gridStart = waypoints[0]
 
-        // Get camera's right direction (perpendicular to view)
-        const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
-        // Pick the side that's closer to the grid start so the arc looks natural
-        const toGrid = new THREE.Vector3().subVectors(gridStart, startPos)
-        const side = toGrid.dot(camRight) > 0 ? 1 : -1
+        // Camera forward direction (into the scene)
+        const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
 
-        // First waypoint: move sideways at roughly the same height
-        const lateral = startPos.clone()
-          .add(camRight.clone().multiplyScalar(side * 60))
-        lateral.y = startPos.y + 5 // slight climb only
+        // First waypoint: fly straight ahead into the scene
+        const ahead = startPos.clone()
+          .add(camForward.clone().multiplyScalar(80))
+        ahead.y = startPos.y + 5 // slight climb only
 
         // Second waypoint: partway toward the grid, easing up to grid altitude
-        const mid = new THREE.Vector3().lerpVectors(lateral, gridStart, 0.5)
+        const mid = new THREE.Vector3().lerpVectors(ahead, gridStart, 0.5)
         mid.y = THREE.MathUtils.lerp(startPos.y, gridStart.y, 0.6)
 
         transitCurveRef.current = new THREE.CatmullRomCurve3(
-          [startPos, lateral, mid, gridStart],
+          [startPos, ahead, mid, gridStart],
           false, 'catmullrom', 0.5
         )
         transitLengthRef.current = transitCurveRef.current.getLength()
