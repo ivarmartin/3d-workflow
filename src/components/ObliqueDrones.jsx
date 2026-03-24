@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Line, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -10,7 +10,6 @@ const SPEED = 120 // meters per second
 const REVEAL_DISTANCE = 50 // meters — camera fades in when drone is within this radius
 const CAMERA_FADE_SPEED = 3 // opacity per second
 const STAGGER_DELAY = 5 // seconds between each oblique drone starting
-const LINE_FADE_SPEED = 0.5 // opacity per second for grid line fade-in
 const ROTOR_SPEED = 25
 const ROTOR_GEO = new THREE.CylinderGeometry(2.5, 2.5, 0.3, 16, 1, false, 0, Math.PI * 0.83)
 const ROTOR_MAT = new THREE.MeshStandardMaterial({ color: '#ff6644', emissive: '#ff3300', emissiveIntensity: 0.3 })
@@ -35,10 +34,10 @@ export default function ObliqueDrones({ url, state }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
   const droneRefs = useRef([null, null, null, null])
-  const lineRefs = useRef([null, null, null, null])
   const rotorRefs = useRef([[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]])
   const progressRefs = useRef([0, 0, 0, 0])
   const timeRef = useRef(0)
+  const [activeDrones, setActiveDrones] = useState(0) // count of active drones (triggers re-render for lines)
 
   // Clone scene, group meshes by heading, and derive flight paths from actual positions
   const { clonedScene, cameraGroups, flights } = useMemo(() => {
@@ -181,14 +180,15 @@ export default function ObliqueDrones({ url, state }) {
   }, [scene])
 
   const staggerTimeRef = useRef(0) // time since fadeIn started
-  const lineOpacityRefs = useRef([0, 0, 0, 0])
+  const prevActiveCountRef = useRef(0)
 
   // Reset animation when entering fadeIn state
   useEffect(() => {
     if (state === 'fadeIn') {
       progressRefs.current = [0, 0, 0, 0]
       staggerTimeRef.current = 0
-      lineOpacityRefs.current = [0, 0, 0, 0]
+      prevActiveCountRef.current = 0
+      setActiveDrones(0)
       clonedScene.traverse((child) => {
         if (child.isMesh) {
           child.material.opacity = 0
@@ -196,7 +196,7 @@ export default function ObliqueDrones({ url, state }) {
         }
       })
     } else if (state === 'visible') {
-      lineOpacityRefs.current = [0.4, 0.4, 0.4, 0.4]
+      setActiveDrones(4)
       clonedScene.traverse((child) => {
         if (child.isMesh) {
           child.material.opacity = 1
@@ -225,19 +225,13 @@ export default function ObliqueDrones({ url, state }) {
         // Hide drone until its start time
         drone.visible = active
 
-        // Fade in grid line when this drone activates
-        if (active && lineOpacityRefs.current[i] < 0.4) {
-          lineOpacityRefs.current[i] = Math.min(0.4, lineOpacityRefs.current[i] + delta * LINE_FADE_SPEED)
-        }
-        const line = lineRefs.current[i]
-        if (line) {
-          line.visible = lineOpacityRefs.current[i] > 0
-          if (line.material) {
-            line.material.opacity = lineOpacityRefs.current[i]
-          }
-        }
-
         if (!active) continue
+
+        // Track when a new drone activates (triggers re-render to show its line)
+        if (i + 1 > prevActiveCountRef.current) {
+          prevActiveCountRef.current = i + 1
+          setActiveDrones(i + 1)
+        }
 
         // Advance progress
         progressRefs.current[i] += (delta * SPEED) / flight.pathLength
@@ -285,15 +279,15 @@ export default function ObliqueDrones({ url, state }) {
       <primitive object={clonedScene} />
       {state === 'fadeIn' && flights.map((flight, i) => (
         <group key={i}>
-          <Line
-            ref={(el) => { lineRefs.current[i] = el }}
-            points={flight.linePoints}
-            color="#66aaff"
-            lineWidth={1}
-            opacity={0}
-            transparent
-            visible={false}
-          />
+          {i < activeDrones && (
+            <Line
+              points={flight.linePoints}
+              color="#66aaff"
+              lineWidth={1}
+              opacity={0.4}
+              transparent
+            />
+          )}
           <group ref={(el) => { droneRefs.current[i] = el }} position={flight.waypoints[0]} visible={false}>
             <mesh>
               <boxGeometry args={[6, 3, 10]} />
