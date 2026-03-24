@@ -13,6 +13,18 @@ const ROTOR_SPEED = 25
 const ROTOR_GEO = new THREE.CylinderGeometry(2.5, 2.5, 0.3, 16, 1, false, 0, Math.PI * 0.83)
 const ROTOR_MAT = new THREE.MeshStandardMaterial({ color: '#ff6644', emissive: '#ff3300', emissiveIntensity: 0.3 })
 const ROTOR_OFFSETS = [[4, 1.8, 6], [-4, 1.8, 6], [4, 1.8, -6], [-4, 1.8, -6]]
+// Wind noise
+const WIND_PITCH_AMP = 3 * (Math.PI / 180)
+const WIND_ROLL_AMP = 2.5 * (Math.PI / 180)
+const WIND_FREQ_1 = 1.7
+const WIND_FREQ_2 = 3.1
+
+function windNoise(t) {
+  const pitch = Math.sin(t * WIND_FREQ_1) * WIND_PITCH_AMP + Math.sin(t * WIND_FREQ_2 + 1.3) * WIND_PITCH_AMP * 0.5
+  const roll = Math.sin(t * WIND_FREQ_1 * 0.8 + 2.1) * WIND_ROLL_AMP + Math.sin(t * WIND_FREQ_2 * 1.2 + 0.7) * WIND_ROLL_AMP * 0.4
+  return { pitch, roll }
+}
+
 const PASS_CLUSTER_THRESHOLD = 15 // meters — max gap between cameras in same pass
 const MIN_PASS_SIZE = 3 // passes with fewer cameras get merged into nearest neighbor
 const PATH_PADDING = 20 // meters — extend path beyond outermost frustums
@@ -23,6 +35,7 @@ export default function ObliqueDrones({ url, state }) {
   const droneRefs = useRef([null, null, null, null])
   const rotorRefs = useRef([[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]])
   const progressRefs = useRef([0, 0, 0, 0])
+  const timeRef = useRef(0)
 
   // Clone scene, group meshes by heading, and derive flight paths from actual positions
   const { clonedScene, cameraGroups, flights } = useMemo(() => {
@@ -186,6 +199,7 @@ export default function ObliqueDrones({ url, state }) {
 
   useFrame((_, delta) => {
     if (!state) return
+    timeRef.current += delta
 
     if (state === 'fadeIn') {
       // Advance each drone and reveal nearby cameras
@@ -201,12 +215,14 @@ export default function ObliqueDrones({ url, state }) {
         const point = flight.curve.getPointAt(progressRefs.current[i])
         drone.position.copy(point)
 
-        // Orient drone toward direction of travel
+        // Face direction of travel (yaw only, stay level) + wind noise
+        const wind = windNoise(timeRef.current + i * 1.7)
         if (progressRefs.current[i] < 0.999) {
           const ahead = flight.curve.getPointAt(
             Math.min(progressRefs.current[i] + 0.002, 1)
           )
-          drone.lookAt(ahead)
+          const yaw = Math.atan2(ahead.x - point.x, ahead.z - point.z)
+          drone.rotation.set(wind.pitch, yaw, wind.roll)
         }
 
         // Spin rotors
