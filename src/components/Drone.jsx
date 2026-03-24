@@ -5,7 +5,7 @@ import * as THREE from 'three'
 
 // How far in front of the camera the drone hovers
 const HOVER_DISTANCE = 80
-const HOVER_DROP = 30 // how far below the camera
+const HOVER_DROP = 0 // vertical offset from camera (0 = centered in view)
 
 // Wind noise — layered sine waves for realistic pitch/roll turbulence
 const WIND_PITCH_AMP = 3 * (Math.PI / 180)
