@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Line } from '@react-three/drei'
+import { Line, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
 // Hover position — near the default camera so the drone is prominent on load
@@ -101,6 +101,23 @@ export default function Drone({ visible, hovering, animating, showPath, position
     return curve.getPoints(500)
   }, [curve])
 
+  // Label position: midpoint of first pass, offset outward along the "across" axis
+  const labelData = useMemo(() => {
+    const p0 = waypoints[0]
+    const p1 = waypoints[1]
+    // Midpoint of first pass
+    const mid = new THREE.Vector3().lerpVectors(p0, p1, 0.5)
+    // Direction along the first pass (strip direction)
+    const dir = new THREE.Vector3().subVectors(p1, p0).normalize()
+    // Outward direction (perpendicular, pointing away from grid center)
+    const outward = new THREE.Vector3(-dir.z, 0, dir.x)
+    // Offset label outside the grid edge
+    const pos = mid.clone().add(outward.multiplyScalar(-45))
+    // Rotation: text lies flat (rotated -90° on X), yaw to align with strip direction
+    const yaw = Math.atan2(dir.x, dir.z)
+    return { pos, yaw }
+  }, [waypoints])
+
   const gridSpeed = 120 // meters per second
   const transitSpeed = 150
 
@@ -191,13 +208,26 @@ export default function Drone({ visible, hovering, animating, showPath, position
     <group>
       {/* Flight path line — visible during stages 1-2 */}
       {showPath && inGrid && (
-        <Line
-          points={linePoints}
-          color="#66aaff"
-          lineWidth={1}
-          opacity={0.4}
-          transparent
-        />
+        <>
+          <Line
+            points={linePoints}
+            color="#66aaff"
+            lineWidth={1}
+            opacity={0.4}
+            transparent
+          />
+          <Text
+            position={[labelData.pos.x, labelData.pos.y, labelData.pos.z]}
+            rotation={[-Math.PI / 2, 0, -labelData.yaw]}
+            fontSize={18}
+            color="#66aaff"
+            anchorX="center"
+            anchorY="middle"
+            fillOpacity={0.7}
+          >
+            2D Mapping Grid
+          </Text>
+        </>
       )}
       {/* Drone body + rotors */}
       <group ref={meshRef} position={HOVER_POS}>
