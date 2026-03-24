@@ -164,7 +164,7 @@ export default function PointCloudRevealer({ url, state }) {
   if (!state || !geometry || !shaderMaterial) return null
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} visible={false}>
       <points geometry={geometry} material={shaderMaterial} />
     </group>
   )
