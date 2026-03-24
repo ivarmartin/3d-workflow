@@ -13,7 +13,7 @@ const BAR_LENGTH = 100 // 100 meters
 const BAR_HEIGHT = 1.5
 const BAR_THICKNESS = 0.5
 const ENDCAP_HEIGHT = 4
-const Y_OFFSET = 2 // slightly above ground to avoid z-fighting
+const Y_OFFSET = 3 // slightly above ground to avoid z-fighting
 
 const FADE_DURATION = 0.75
 
