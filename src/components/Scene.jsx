@@ -37,7 +37,7 @@ const MAP_ANGLE_RAD = MAP_ANGLE_DEG * (Math.PI / 180)
 
 // Stage 6 spiral camera config
 const SPIRAL_DURATION = 13       // seconds
-const SPIRAL_ROTATIONS = 3       // full 360° rotations
+const SPIRAL_ROTATIONS = 1       // full 360° rotations
 const SPIRAL_START_DIST = 300    // start close
 const SPIRAL_END_DIST = 900      // end further out
 const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
@@ -357,7 +357,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         dronePositionRef={dronePositionRef}
         onFrustumClick={onFrustumClick}
       />
-      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} />
+      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 5 : 0.75} />
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} />
       <ObliqueDrones url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />

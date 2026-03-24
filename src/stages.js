@@ -59,7 +59,7 @@ export function getVisibility(stage) {
     groundPlane:    stage <= 2 ? 'visible' : stage === 3 ? 'fadeOut' : undefined,
     // Nadir cameras fade in at stage 2, visible at stage 3 (faded out after map via Scene.jsx), hidden from stage 4+
     nadirCameras:   stage === 2 ? 'fadeIn' : stage === 3 ? 'visible' : undefined,
-    map:            stage === 3 ? 'fadeIn' : stage >= 4 ? 'visible' : undefined,
+    map:            stage === 3 ? 'fadeIn' : (stage === 4 || stage === 5) ? 'visible' : stage === 6 ? 'fadeOut' : undefined,
     obliqueCameras: stage === 5 ? 'fadeIn' : stage >= 6 ? 'visible' : undefined,
     pointCloud:     stage === 6 ? 'fadeIn' : stage === 7 ? 'fadeOut' : undefined,
     mesh:           stage === 7 ? 'fadeIn' : stage >= 8 ? 'visible' : undefined,
