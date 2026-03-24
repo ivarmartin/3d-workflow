@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import FadeModel from './FadeModel'
 import Drone from './Drone'
 import NadirCameras from './NadirCameras'
+import ObliqueDrones from './ObliqueDrones'
 import GroundPlane from './GroundPlane'
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
@@ -88,7 +89,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick }) {
         onFrustumClick={onFrustumClick}
       />
       <FadeModel url={MODELS.map} state={visibility.map} />
-      <FadeModel url={MODELS.obliqueCameras} state={visibility.obliqueCameras} overrideMaterial={GRAY_MATERIAL} />
+      <ObliqueDrones url={MODELS.obliqueCameras} state={visibility.obliqueCameras} />
       <FadeModel url={MODELS.pointCloud} state={visibility.pointCloud} />
       <FadeModel url={MODELS.mesh} state={visibility.mesh} />
     </>

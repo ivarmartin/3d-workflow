@@ -1,0 +1,197 @@
+import { useRef, useMemo, useEffect } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Line, useGLTF } from '@react-three/drei'
+import * as THREE from 'three'
+
+// 4 oblique flight directions relative to nadir (136°)
+const FLIGHT_ANGLES = [136, 316, 226, 46] // degrees
+const ALTITUDE = 97
+const SPACING = 38
+const CX = -20
+const CZ = -15
+const HALF_ALONG = 500
+const HALF_ACROSS = 280
+const SPEED = 120 // meters per second
+const REVEAL_DISTANCE = 50 // meters — camera fades in when drone is within this radius
+const CAMERA_FADE_SPEED = 3 // opacity per second
+
+function generateLawnmowerPath(angleDeg) {
+  const y = ALTITUDE
+  const angle = angleDeg * (Math.PI / 180)
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+
+  const numPasses = Math.ceil((HALF_ACROSS * 2) / SPACING)
+  const waypoints = []
+  let forward = true
+
+  for (let i = 0; i <= numPasses; i++) {
+    const across = -HALF_ACROSS + i * SPACING
+
+    const localA = { u: across, v: -HALF_ALONG }
+    const localB = { u: across, v: HALF_ALONG }
+
+    const ax = CX + localA.u * cos - localA.v * sin
+    const az = CZ + localA.u * sin + localA.v * cos
+    const bx = CX + localB.u * cos - localB.v * sin
+    const bz = CZ + localB.u * sin + localB.v * cos
+
+    if (forward) {
+      waypoints.push(new THREE.Vector3(ax, y, az))
+      waypoints.push(new THREE.Vector3(bx, y, bz))
+    } else {
+      waypoints.push(new THREE.Vector3(bx, y, bz))
+      waypoints.push(new THREE.Vector3(ax, y, az))
+    }
+    forward = !forward
+  }
+
+  return waypoints
+}
+
+export default function ObliqueDrones({ url, state }) {
+  const { scene } = useGLTF(url)
+  const groupRef = useRef()
+  const droneRefs = useRef([null, null, null, null])
+  const progressRefs = useRef([0, 0, 0, 0])
+
+  // Clone scene and prepare meshes for individual opacity control
+  const { clonedScene, cameraGroups } = useMemo(() => {
+    const clone = scene.clone(true)
+    clone.updateMatrixWorld(true)
+
+    // Collect all meshes with their world positions and headings
+    const meshData = []
+    clone.traverse((child) => {
+      if (!child.isMesh) return
+      child.material = child.material.clone()
+      child.material.transparent = true
+      child.material.depthWrite = true
+      child.material.opacity = 0
+
+      const pos = new THREE.Vector3()
+      const quat = new THREE.Quaternion()
+      child.getWorldPosition(pos)
+      child.getWorldQuaternion(quat)
+
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(quat)
+      const headingDeg = ((Math.atan2(fwd.x, fwd.z) * 180 / Math.PI) + 360) % 360
+
+      meshData.push({ mesh: child, pos, heading: headingDeg })
+    })
+
+    // Group by nearest flight angle
+    const groups = [[], [], [], []]
+    meshData.forEach((d) => {
+      let minDist = Infinity
+      let bestIdx = 0
+      FLIGHT_ANGLES.forEach((target, i) => {
+        let diff = Math.abs(d.heading - target)
+        if (diff > 180) diff = 360 - diff
+        if (diff < minDist) {
+          minDist = diff
+          bestIdx = i
+        }
+      })
+      groups[bestIdx].push(d)
+    })
+
+    return { clonedScene: clone, cameraGroups: groups }
+  }, [scene])
+
+  // Build curves and line points for each flight
+  const flights = useMemo(() => {
+    return FLIGHT_ANGLES.map((angleDeg) => {
+      const waypoints = generateLawnmowerPath(angleDeg)
+      const curve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.01)
+      const pathLength = curve.getLength()
+      const linePoints = curve.getPoints(500)
+      return { waypoints, curve, pathLength, linePoints }
+    })
+  }, [])
+
+  // Reset animation when entering fadeIn state
+  useEffect(() => {
+    if (state === 'fadeIn') {
+      progressRefs.current = [0, 0, 0, 0]
+      clonedScene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.opacity = 0
+          child.material.depthWrite = false
+        }
+      })
+    } else if (state === 'visible') {
+      clonedScene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.opacity = 1
+          child.material.depthWrite = true
+        }
+      })
+    }
+  }, [state, clonedScene])
+
+  useFrame((_, delta) => {
+    if (!state) return
+
+    if (state === 'fadeIn') {
+      // Advance each drone and reveal nearby cameras
+      for (let i = 0; i < 4; i++) {
+        const drone = droneRefs.current[i]
+        const flight = flights[i]
+        if (!drone || !flight) continue
+
+        // Advance progress
+        progressRefs.current[i] += (delta * SPEED) / flight.pathLength
+        progressRefs.current[i] = Math.min(progressRefs.current[i], 1)
+
+        const point = flight.curve.getPointAt(progressRefs.current[i])
+        drone.position.copy(point)
+
+        // Orient drone toward direction of travel
+        if (progressRefs.current[i] < 0.999) {
+          const ahead = flight.curve.getPointAt(
+            Math.min(progressRefs.current[i] + 0.002, 1)
+          )
+          drone.lookAt(ahead)
+        }
+
+        // Reveal cameras near drone (XZ distance only)
+        const group = cameraGroups[i]
+        for (let j = 0; j < group.length; j++) {
+          const cam = group[j]
+          if (cam.mesh.material.opacity >= 1) continue
+          const dx = point.x - cam.pos.x
+          const dz = point.z - cam.pos.z
+          const dist = Math.sqrt(dx * dx + dz * dz)
+          if (dist < REVEAL_DISTANCE) {
+            cam.mesh.material.opacity = Math.min(1, cam.mesh.material.opacity + delta * CAMERA_FADE_SPEED)
+            cam.mesh.material.depthWrite = cam.mesh.material.opacity > 0.5
+          }
+        }
+      }
+    }
+  })
+
+  if (!state) return null
+
+  return (
+    <group ref={groupRef}>
+      <primitive object={clonedScene} />
+      {state === 'fadeIn' && flights.map((flight, i) => (
+        <group key={i}>
+          <Line
+            points={flight.linePoints}
+            color="#66aaff"
+            lineWidth={1}
+            opacity={0.4}
+            transparent
+          />
+          <mesh ref={(el) => { droneRefs.current[i] = el }} position={flight.waypoints[0]}>
+            <boxGeometry args={[4, 2, 4]} />
+            <meshStandardMaterial color="#ff6644" emissive="#ff3300" emissiveIntensity={0.3} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
