@@ -128,27 +128,31 @@ export default function Drone({ visible, hovering, animating, showPath, position
     // Detect when animating starts
     if (animating && !prevAnimatingRef.current) {
       if (phaseRef.current === 'hover') {
-        // Coming from stage 0 — fly forward (away from camera) into the scene,
-        // then curve toward the grid start
+        // Smooth cubic Bezier arc: departs straight ahead from camera,
+        // arrives smoothly at grid start with no sharp turns.
         const startPos = meshRef.current.position.clone()
         const gridStart = waypoints[0]
 
         // Camera forward direction (into the scene)
         const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
 
-        // First waypoint: fly straight ahead into the scene
-        const ahead = startPos.clone()
-          .add(camForward.clone().multiplyScalar(80))
-        ahead.y = startPos.y + 5 // slight climb only
+        // P1: pull handle along camera forward — controls departure direction
+        // Long handle = drone flies straight ahead for longer before curving
+        const dist = startPos.distanceTo(gridStart)
+        const handleLen = Math.max(dist * 0.45, 80)
+        const p1 = startPos.clone().add(camForward.clone().multiplyScalar(handleLen))
+        p1.y = THREE.MathUtils.lerp(startPos.y, gridStart.y, 0.25)
 
-        // Second waypoint: partway toward the grid, easing up to grid altitude
-        const mid = new THREE.Vector3().lerpVectors(ahead, gridStart, 0.5)
-        mid.y = THREE.MathUtils.lerp(startPos.y, gridStart.y, 0.6)
+        // P2: pull handle approaching grid start from its incoming direction
+        // Use direction from grid waypoint 0→1 reversed, so drone arrives aligned
+        const gridDir = new THREE.Vector3().subVectors(waypoints[0], waypoints[1]).normalize()
+        const p2 = gridStart.clone().add(gridDir.multiplyScalar(handleLen * 0.6))
+        p2.y = THREE.MathUtils.lerp(startPos.y, gridStart.y, 0.75)
 
-        transitCurveRef.current = new THREE.CatmullRomCurve3(
-          [startPos, ahead, mid, gridStart],
-          false, 'catmullrom', 0.5
-        )
+        // Sample the cubic Bezier into points for a CatmullRom (smooth arc)
+        const bezier = new THREE.CubicBezierCurve3(startPos, p1, p2, gridStart)
+        const samples = bezier.getPoints(20)
+        transitCurveRef.current = new THREE.CatmullRomCurve3(samples, false, 'catmullrom', 0.0)
         transitLengthRef.current = transitCurveRef.current.getLength()
         phaseRef.current = 'transit'
         transitRef.current = 0
