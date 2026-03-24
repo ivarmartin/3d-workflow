@@ -45,7 +45,7 @@ export default function App() {
       >
         <color attach="background" args={[bgColor]} />
         <Suspense fallback={null}>
-          <Scene visibility={visibility} darkMode={darkMode} onFrustumClick={handleFrustumClick} />
+          <Scene visibility={visibility} darkMode={darkMode} onFrustumClick={handleFrustumClick} currentStage={currentStage} />
         </Suspense>
       </Canvas>
 
