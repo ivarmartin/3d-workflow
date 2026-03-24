@@ -166,7 +166,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
         target.z + Math.sin(currentAngle) * hDist
       )
       goalTarget = target.clone()
-      duration = 1.5 // fly-in duration before spiral starts
+      duration = 3 // fly-in duration before spiral starts
       autoRotateAfter = false
     }
 
@@ -381,7 +381,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         dronePositionRef={dronePositionRef}
         onFrustumClick={onFrustumClick}
       />
-      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 2 : 0.75} />
+      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} />
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} />
       <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
