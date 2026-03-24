@@ -124,8 +124,9 @@ export default function PointCloudRevealer({ url, state }) {
       progressRef.current = 0
       if (materialRef.current) {
         materialRef.current.uniforms.uProgress.value = 0
-        materialRef.current.uniforms.uGlobalOpacity.value = 1
+        materialRef.current.uniforms.uGlobalOpacity.value = 0 // start fully transparent
       }
+      // visible=true is safe because opacity is 0 — useFrame will ramp it up
       if (groupRef.current) groupRef.current.visible = true
     } else if (state === 'visible') {
       progressRef.current = 1
@@ -138,6 +139,10 @@ export default function PointCloudRevealer({ url, state }) {
       // Keep current progress, just fade opacity
     } else {
       if (groupRef.current) groupRef.current.visible = false
+      if (materialRef.current) {
+        materialRef.current.uniforms.uGlobalOpacity.value = 0
+        materialRef.current.uniforms.uProgress.value = 0
+      }
     }
   }, [state])
 
@@ -150,6 +155,10 @@ export default function PointCloudRevealer({ url, state }) {
       if (progressRef.current < 1) {
         progressRef.current = Math.min(1, progressRef.current + delta / REVEAL_DURATION)
         mat.uniforms.uProgress.value = progressRef.current
+      }
+      // Ramp opacity 0→1 over first 1 second so there's no flash
+      if (mat.uniforms.uGlobalOpacity.value < 1) {
+        mat.uniforms.uGlobalOpacity.value = Math.min(1, mat.uniforms.uGlobalOpacity.value + delta)
       }
     } else if (state === 'fadeOut') {
       const opacity = mat.uniforms.uGlobalOpacity.value
