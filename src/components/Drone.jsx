@@ -7,6 +7,18 @@ import * as THREE from 'three'
 const HOVER_DISTANCE = 80
 const HOVER_DROP = 30 // how far below the camera
 
+// Wind noise — layered sine waves for realistic pitch/roll turbulence
+const WIND_PITCH_AMP = 3 * (Math.PI / 180)
+const WIND_ROLL_AMP = 2.5 * (Math.PI / 180)
+const WIND_FREQ_1 = 1.7
+const WIND_FREQ_2 = 3.1
+
+function windNoise(t) {
+  const pitch = Math.sin(t * WIND_FREQ_1) * WIND_PITCH_AMP + Math.sin(t * WIND_FREQ_2 + 1.3) * WIND_PITCH_AMP * 0.5
+  const roll = Math.sin(t * WIND_FREQ_1 * 0.8 + 2.1) * WIND_ROLL_AMP + Math.sin(t * WIND_FREQ_2 * 1.2 + 0.7) * WIND_ROLL_AMP * 0.4
+  return { pitch, roll }
+}
+
 // Generate a lawnmower grid path rotated to align with the nadir camera strips
 // Camera strips run ~50° from vertical (upper-left to lower-right)
 function generateLawnmowerPath() {
@@ -73,7 +85,7 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const phaseRef = useRef('hover') // 'hover' | 'transit' | 'grid'
   const [inGrid, setInGrid] = useState(false)
   const transitRef = useRef(0) // 0→1 lerp for hover-to-grid-start
-  const hoverTimeRef = useRef(0)
+  const timeRef = useRef(0)
   const prevAnimatingRef = useRef(false)
   const prevHoveringRef = useRef(hovering)
   const transitCurveRef = useRef(null)
@@ -108,7 +120,7 @@ export default function Drone({ visible, hovering, animating, showPath, position
       phaseRef.current = 'hover'
       progressRef.current = 0
       transitRef.current = 0
-      hoverTimeRef.current = 0
+      timeRef.current = 0
       setInGrid(false)
     }
     prevHoveringRef.current = hovering
@@ -134,26 +146,30 @@ export default function Drone({ visible, hovering, animating, showPath, position
     }
     prevAnimatingRef.current = animating
 
-    // Spin rotors (before phase logic so it runs every frame)
+    // Accumulate time and spin rotors (before phase logic so it runs every frame)
+    timeRef.current += delta
     const rotorSpeed = 25
     for (const ref of rotorRefs) {
       if (ref.current) ref.current.rotation.y += delta * rotorSpeed
     }
+    const t = timeRef.current
+    const wind = windNoise(t)
 
     if (phaseRef.current === 'hover') {
       // Position drone in front of the camera
-      hoverTimeRef.current += delta
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
       const hoverPos = camera.position.clone()
         .add(dir.multiplyScalar(HOVER_DISTANCE))
       hoverPos.y -= HOVER_DROP
       // Gentle bob
-      const bobY = Math.sin(hoverTimeRef.current * 1.5) * 3
+      const bobY = Math.sin(timeRef.current * 1.5) * 3
       hoverPos.y += bobY
       meshRef.current.position.copy(hoverPos)
       if (positionRef) positionRef.current = meshRef.current.position
-      // Face the camera
-      meshRef.current.lookAt(camera.position)
+      // Face the camera (yaw only, stay level)
+      const camDir = camera.position.clone().sub(meshRef.current.position)
+      const yaw = Math.atan2(camDir.x, camDir.z)
+      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
       return
     }
 
@@ -170,9 +186,10 @@ export default function Drone({ visible, hovering, animating, showPath, position
       const point = tc.getPointAt(Math.min(transitRef.current, 1))
       meshRef.current.position.copy(point)
       if (positionRef) positionRef.current = point
-      // Look toward direction of travel
+      // Face direction of travel (yaw only, stay level)
       const ahead = tc.getPointAt(Math.min(transitRef.current + 0.02, 1))
-      meshRef.current.lookAt(ahead)
+      const yaw = Math.atan2(ahead.x - point.x, ahead.z - point.z)
+      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
       return
     }
 
@@ -186,10 +203,11 @@ export default function Drone({ visible, hovering, animating, showPath, position
     meshRef.current.position.copy(point)
     if (positionRef) positionRef.current = point
 
-    // Look in direction of travel
+    // Face direction of travel (yaw only, stay level)
     if (progressRef.current < 0.999) {
       const ahead = curve.getPointAt(Math.min(progressRef.current + 0.002, 1))
-      meshRef.current.lookAt(ahead)
+      const yaw = Math.atan2(ahead.x - point.x, ahead.z - point.z)
+      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
     }
 
   })
