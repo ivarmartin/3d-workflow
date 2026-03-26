@@ -35,13 +35,17 @@ const MAP_HALF_ACROSS = 133      // half-width along short axis (266m total)
 const MAP_ANGLE_DEG = 136        // rotation of long axis in degrees
 const MAP_ANGLE_RAD = MAP_ANGLE_DEG * (Math.PI / 180)
 
-// Stage 6 spiral camera config
+// Stage 8 spiral camera config (was stage 6)
 const SPIRAL_DURATION = 13       // seconds
 const SPIRAL_ROTATIONS = 1       // full 360° rotations
 const SPIRAL_START_DIST = 300    // start close
 const SPIRAL_END_DIST = 900      // end further out
 const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
 const SPIRAL_END_ELEV = 40       // degrees — end higher
+
+// Profile view: drone hovers at this position, camera views from the side
+const PROFILE_DRONE_POS = new THREE.Vector3(-30, 100, -22)
+const PROFILE_SIDE_OFFSET = 60   // how far the viewer camera sits to the side
 
 // CameraAnimator — smoothly flies camera for stage transitions
 function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
@@ -75,15 +79,26 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
     let duration = 1.5
     let autoRotateAfter = false
 
-    // Stop spiral if leaving stage 6
-    if (prev === 6 && currentStage !== 6 && spiralRef.current) {
+    // Stop spiral if leaving stage 8
+    if (prev === 8 && currentStage !== 8 && spiralRef.current) {
       spiralRef.current = false
       animatingRef.current = false
       if (controlsRef.current) controlsRef.current.enabled = true
     }
 
-    if (currentStage === 3 && prev !== 3) {
-      // Stage 3: top-down map view
+    if ((currentStage === 2 || currentStage === 6) && prev !== currentStage) {
+      // Profile view: viewer camera to the right side of the drone
+      goalPos = new THREE.Vector3(
+        PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
+        PROFILE_DRONE_POS.y + 5,
+        PROFILE_DRONE_POS.z
+      )
+      goalTarget = PROFILE_DRONE_POS.clone()
+      duration = 2.0
+      autoRotateAfter = false
+
+    } else if (currentStage === 4 && prev !== 4) {
+      // Stage 4 (was 3): top-down map view
       let fitDimension
       if (isPortrait) {
         const verticalFit = (MAP_HALF_ALONG * 2 * 1.15) / (2 * Math.tan(fovRad / 2))
@@ -108,13 +123,11 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       goalTarget = target.clone()
       autoRotateAfter = false
 
-    } else if (currentStage === 4 && prev !== 4) {
-      // Stage 4: flat plane view — near side-on (~10° elevation) to show map is flat
-      // Camera positioned at low elevation angle along the map's short axis
-      const elevAngle = 10 * (Math.PI / 180) // 10 degrees above horizontal
-      const distance = 1200 // far enough to see the full map as a flat plane
+    } else if (currentStage === 5 && prev !== 5) {
+      // Stage 5 (was 4): flat plane view — near side-on (~10° elevation) to show map is flat
+      const elevAngle = 10 * (Math.PI / 180)
+      const distance = 1200
 
-      // Position camera along the short axis (perpendicular to long axis)
       const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
       const horizontalDist = distance * Math.cos(elevAngle)
       const camY = distance * Math.sin(elevAngle)
@@ -128,12 +141,11 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       duration = 2.0
       autoRotateAfter = true
 
-    } else if (currentStage === 5 && prev !== 5) {
-      // Stage 5: oblique cameras — 45° looking down, zoomed out to see full grids
+    } else if (currentStage === 7 && prev !== 7) {
+      // Stage 7 (was 5): oblique cameras — 45° looking down, zoomed out to see full grids
       const elevAngle = 45 * (Math.PI / 180)
-      const distance = 1600 // further out to see oblique grids
+      const distance = 1600
 
-      // Approach from a direction along the map's short axis
       const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
       const horizontalDist = distance * Math.cos(elevAngle)
       const camY = distance * Math.sin(elevAngle)
@@ -147,14 +159,12 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       duration = 2.0
       autoRotateAfter = false
 
-    } else if (currentStage === 6 && prev !== 6) {
-      // Stage 6: point cloud — spiral camera outward while points reveal
-      // First, smoothly fly to starting position of spiral, then switch to spiral mode
+    } else if (currentStage === 8 && prev !== 8) {
+      // Stage 8 (was 6): point cloud — spiral camera outward while points reveal
       const startElev = SPIRAL_START_ELEV * (Math.PI / 180)
       const hDist = SPIRAL_START_DIST * Math.cos(startElev)
       const camY = SPIRAL_START_DIST * Math.sin(startElev)
 
-      // Compute starting angle from current camera position
       const dx = camera.position.x - target.x
       const dz = camera.position.z - target.z
       const currentAngle = Math.atan2(dz, dx)
@@ -190,7 +200,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
 
     const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
 
-    // Spiral animation (stage 6)
+    // Spiral animation (stage 8)
     if (spiralRef.current) {
       progressRef.current += delta / SPIRAL_DURATION
       if (progressRef.current >= 1) {
@@ -234,8 +244,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       progressRef.current = 1
       animatingRef.current = false
 
-      // If stage 6 fly-in just finished, start the spiral
-      if (prevStageRef.current === 6) {
+      // If stage 8 fly-in just finished, start the spiral
+      if (prevStageRef.current === 8) {
         spiralRef.current = true
         progressRef.current = 0
         if (onSpiralStart) onSpiralStart()
@@ -273,7 +283,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   // Delay map + scale bar fade-in until after camera animation completes
   const [mapReady, setMapReady] = useState(false)
   const mapTimerRef = useRef(null)
-  // Fade out nadir cameras after map has fully faded in at stage 3
+  // Fade out nadir cameras after map has fully faded in at stage 4
   const [nadirHidden, setNadirHidden] = useState(false)
   const nadirTimerRef = useRef(null)
   // Spiral-dependent states: point cloud waits for spiral, oblique cameras fade 5s in
@@ -288,9 +298,9 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
     obliqueFadeTimerRef.current = setTimeout(() => setObliqueFadeOut(true), 5000)
   }, [])
 
-  // Reset spiral states when leaving stage 6
+  // Reset spiral states when leaving stage 8
   useEffect(() => {
-    if (currentStage !== 6) {
+    if (currentStage !== 8) {
       setSpiralStarted(false)
       setObliqueFadeOut(false)
       if (obliqueFadeTimerRef.current) clearTimeout(obliqueFadeTimerRef.current)
@@ -301,7 +311,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   }, [currentStage])
 
   useEffect(() => {
-    if (currentStage === 3) {
+    if (currentStage === 4) {
       // Camera animation takes 1.5s; wait an extra 1s before showing the map
       setMapReady(false)
       setNadirHidden(false)
@@ -313,9 +323,9 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
     } else {
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
       if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
-      // For stages > 3, show map immediately (it's already loaded)
-      setMapReady(currentStage > 3)
-      setNadirHidden(currentStage > 3)
+      // For stages > 4, show map immediately (it's already loaded)
+      setMapReady(currentStage > 4)
+      setNadirHidden(currentStage > 4)
     }
     return () => {
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
@@ -333,8 +343,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
   const handleInteractionEnd = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     idleTimerRef.current = setTimeout(() => {
-      // Don't re-enable autorotate at stage 3 (top-down map view) or 5 (oblique)
-      if (controlsRef.current && currentStageRef.current !== 3 && currentStageRef.current !== 5) {
+      // Don't re-enable autorotate at stage 4 (top-down map view) or 7 (oblique)
+      if (controlsRef.current && currentStageRef.current !== 4 && currentStageRef.current !== 7) {
         controlsRef.current.autoRotate = true
       }
     }, 5000)
@@ -366,11 +376,19 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         onEnd={handleInteractionEnd}
       />
 
-      {/* Ground plane (stages 0-1, fades out at stage 2) */}
+      {/* Ground plane (stages 0-3, fades out at stage 4) */}
       <GroundPlane state={visibility.groundPlane} darkMode={darkMode} />
 
-      {/* Drone (stages 0-2) */}
-      <Drone visible={visibility.drone} hovering={visibility.droneHovering} animating={visibility.droneAnimating} showPath={visibility.dronePath} positionRef={dronePositionRef} />
+      {/* Drone (stages 0-2, 6) */}
+      <Drone
+        visible={visibility.drone}
+        hovering={visibility.droneHovering}
+        animating={visibility.droneAnimating}
+        showPath={visibility.dronePath}
+        positionRef={dronePositionRef}
+        profileNadir={visibility.droneProfileNadir}
+        profileOblique={visibility.droneProfileOblique}
+      />
 
       {/* Nadir cameras with progressive drone-reveal */}
       <NadirCameras

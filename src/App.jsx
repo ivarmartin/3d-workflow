@@ -23,7 +23,7 @@ export default function App() {
   } = useStageManager()
 
   const handleFrustumClick = useCallback((name) => {
-    if (currentStage !== 2) return
+    if (currentStage !== 3) return
     // Strip trailing 001 suffix from GLB mesh name (e.g. DJI_...V001 -> DJI_...V)
     const baseName = name.replace(/\d{3}$/, '')
     setSelectedImage(`${THUMB_BASE}${baseName}.jpg`)

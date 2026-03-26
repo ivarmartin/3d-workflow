@@ -19,6 +19,31 @@ function windNoise(t) {
   return { pitch, roll }
 }
 
+// Camera look-around noise for idle/hover — medium organic feel
+const LOOK_YAW_AMP = 15 * (Math.PI / 180)
+const LOOK_PITCH_AMP = 10 * (Math.PI / 180)
+const LOOK_FREQ_1 = 0.4
+const LOOK_FREQ_2 = 0.9
+const LOOK_FREQ_3 = 0.17 // very slow attention-shift envelope
+
+function cameraLookNoise(t) {
+  // Slow modulation creates natural "attention dwell" pauses
+  const attentionMod = 0.5 + 0.5 * Math.sin(t * LOOK_FREQ_3)
+  const yaw = (Math.sin(t * LOOK_FREQ_1) * LOOK_YAW_AMP
+    + Math.sin(t * LOOK_FREQ_2 + 2.1) * LOOK_YAW_AMP * 0.3) * attentionMod
+  const pitch = (Math.sin(t * LOOK_FREQ_1 * 0.7 + 1.4) * LOOK_PITCH_AMP
+    + Math.sin(t * LOOK_FREQ_2 * 0.6 + 3.2) * LOOK_PITCH_AMP * 0.25) * attentionMod
+  return { yaw, pitch }
+}
+
+// Camera pitch targets
+const PITCH_FORWARD = 0
+const PITCH_NADIR = -Math.PI / 2
+const PITCH_OBLIQUE = -Math.PI / 4
+
+// Profile hover position (above scene center)
+const PROFILE_POS = new THREE.Vector3(-30, 100, -22)
+
 // Generate a lawnmower grid path rotated to align with the nadir camera strips
 // Camera strips run ~50° from vertical (upper-left to lower-right)
 function generateLawnmowerPath() {
@@ -78,11 +103,18 @@ const ROTOR_OFFSETS = [
   [-4, 1.8, -6],
 ]
 
-export default function Drone({ visible, hovering, animating, showPath, positionRef }) {
+// Shared camera geometry + materials (reused by ObliqueDrones too)
+export const CAMERA_BODY_GEO = new THREE.CylinderGeometry(2, 2, 2.5, 16, 1, false, 0, Math.PI)
+export const CAMERA_BODY_MAT = new THREE.MeshStandardMaterial({ color: '#ff6644', emissive: '#ff3300', emissiveIntensity: 0.3 })
+export const CAMERA_LENS_GEO = new THREE.RingGeometry(0.9, 1.3, 24)
+export const CAMERA_LENS_MAT = new THREE.MeshStandardMaterial({ color: '#111111', side: THREE.DoubleSide })
+
+export default function Drone({ visible, hovering, animating, showPath, positionRef, profileNadir, profileOblique }) {
   const meshRef = useRef()
   const rotorRefs = [useRef(), useRef(), useRef(), useRef()]
+  const cameraGimbalRef = useRef()
   const progressRef = useRef(0)
-  const phaseRef = useRef('hover') // 'hover' | 'transit' | 'grid'
+  const phaseRef = useRef('hover') // 'hover' | 'transit' | 'grid' | 'depart'
   const [inGrid, setInGrid] = useState(false)
   const transitRef = useRef(0) // 0→1 lerp for hover-to-grid-start
   const timeRef = useRef(0)
@@ -92,6 +124,21 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const transitLengthRef = useRef(0)
   const [lineOpacity, setLineOpacity] = useState(0)
   const lineOpacityRef = useRef(0)
+
+  // Camera pitch animation state
+  const cameraPitchRef = useRef(0)
+  const profileAnimStartRef = useRef(0)
+  const profileAnimActiveRef = useRef(false)
+  const profileAnimFromRef = useRef(0)
+  const profileAnimToRef = useRef(0)
+  const prevProfileNadirRef = useRef(false)
+  const prevProfileObliqueRef = useRef(false)
+
+  // Departure animation state
+  const departCurveRef = useRef(null)
+  const departLengthRef = useRef(0)
+  const departProgressRef = useRef(0)
+  const departSpeed = 150
 
   const { camera } = useThree()
 
@@ -169,6 +216,26 @@ export default function Drone({ visible, hovering, animating, showPath, position
     }
     prevAnimatingRef.current = animating
 
+    // Detect profile stage transitions — start pitch animations
+    if (profileNadir && !prevProfileNadirRef.current) {
+      phaseRef.current = 'hover'
+      profileAnimFromRef.current = PITCH_FORWARD
+      profileAnimToRef.current = PITCH_NADIR
+      cameraPitchRef.current = PITCH_FORWARD
+      profileAnimStartRef.current = timeRef.current
+      profileAnimActiveRef.current = true
+    }
+    if (profileOblique && !prevProfileObliqueRef.current) {
+      phaseRef.current = 'hover'
+      profileAnimFromRef.current = PITCH_NADIR
+      profileAnimToRef.current = PITCH_OBLIQUE
+      cameraPitchRef.current = PITCH_NADIR
+      profileAnimStartRef.current = timeRef.current
+      profileAnimActiveRef.current = true
+    }
+    prevProfileNadirRef.current = profileNadir
+    prevProfileObliqueRef.current = profileOblique
+
     // Accumulate time and spin rotors (before phase logic so it runs every frame)
     timeRef.current += delta
     const rotorSpeed = 25
@@ -177,6 +244,31 @@ export default function Drone({ visible, hovering, animating, showPath, position
     }
     const t = timeRef.current
     const wind = windNoise(t)
+
+    // Profile stages: hover at fixed world position with fixed yaw
+    if (profileNadir || profileOblique) {
+      const bobY = Math.sin(t * 1.5) * 3
+      meshRef.current.position.set(PROFILE_POS.x, PROFILE_POS.y + bobY, PROFILE_POS.z)
+      if (positionRef) positionRef.current = meshRef.current.position
+      // Fixed yaw so the right side faces the viewer camera (which is at +X offset)
+      // Drone faces -X direction so viewer sees right profile
+      meshRef.current.rotation.set(wind.pitch, -Math.PI / 2, wind.roll)
+
+      // Camera pitch animation
+      if (profileAnimActiveRef.current && cameraGimbalRef.current) {
+        const elapsed = t - profileAnimStartRef.current
+        const duration = 2.0
+        const p = Math.min(elapsed / duration, 1)
+        // Cubic ease-in-out
+        const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
+        cameraPitchRef.current = profileAnimFromRef.current + (profileAnimToRef.current - profileAnimFromRef.current) * ease
+        if (p >= 1) profileAnimActiveRef.current = false
+      }
+      if (cameraGimbalRef.current) {
+        cameraGimbalRef.current.rotation.set(cameraPitchRef.current, 0, 0)
+      }
+      return
+    }
 
     if (phaseRef.current === 'hover') {
       // Position drone in front of the camera
@@ -193,6 +285,13 @@ export default function Drone({ visible, hovering, animating, showPath, position
       const camDir = camera.position.clone().sub(meshRef.current.position)
       const yaw = Math.atan2(camDir.x, camDir.z)
       meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
+
+      // Idle camera look-around
+      if (cameraGimbalRef.current) {
+        const look = cameraLookNoise(t)
+        cameraGimbalRef.current.rotation.set(look.pitch, look.yaw, 0)
+        cameraPitchRef.current = look.pitch
+      }
       return
     }
 
@@ -218,6 +317,32 @@ export default function Drone({ visible, hovering, animating, showPath, position
       const ahead = tc.getPointAt(Math.min(transitRef.current + 0.02, 1))
       const yaw = Math.atan2(ahead.x - point.x, ahead.z - point.z)
       meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
+
+      // Camera at nadir during flight
+      if (cameraGimbalRef.current) {
+        cameraGimbalRef.current.rotation.set(PITCH_NADIR, 0, 0)
+        cameraPitchRef.current = PITCH_NADIR
+      }
+      return
+    }
+
+    if (phaseRef.current === 'depart') {
+      const dc = departCurveRef.current
+      if (!dc) return
+      departProgressRef.current += (delta * departSpeed) / departLengthRef.current
+      if (departProgressRef.current >= 1) {
+        departProgressRef.current = 1
+        phaseRef.current = 'hover'
+      }
+      const point = dc.getPointAt(Math.min(departProgressRef.current, 1))
+      meshRef.current.position.copy(point)
+      if (positionRef) positionRef.current = point
+      const ahead = dc.getPointAt(Math.min(departProgressRef.current + 0.02, 1))
+      const yaw = Math.atan2(ahead.x - point.x, ahead.z - point.z)
+      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
+      if (cameraGimbalRef.current) {
+        cameraGimbalRef.current.rotation.set(PITCH_NADIR, 0, 0)
+      }
       return
     }
 
@@ -238,6 +363,12 @@ export default function Drone({ visible, hovering, animating, showPath, position
       meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
     }
 
+    // Camera at nadir during grid flight
+    if (cameraGimbalRef.current) {
+      cameraGimbalRef.current.rotation.set(PITCH_NADIR, 0, 0)
+      cameraPitchRef.current = PITCH_NADIR
+    }
+
   })
 
   if (!visible) return null
@@ -254,7 +385,7 @@ export default function Drone({ visible, hovering, animating, showPath, position
           transparent
         />
       )}
-      {/* Drone body + rotors */}
+      {/* Drone body + rotors + camera */}
       <group ref={meshRef}>
         <mesh>
           <boxGeometry args={[6, 3, 10]} />
@@ -269,6 +400,13 @@ export default function Drone({ visible, hovering, animating, showPath, position
             material={ROTOR_MAT}
           />
         ))}
+        {/* Camera gimbal — pitches independently */}
+        <group ref={cameraGimbalRef} position={[0, -1.5, -5]}>
+          {/* Half-cylinder camera body — flat face forward */}
+          <mesh rotation={[Math.PI / 2, 0, 0]} geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
+          {/* Lens ring on flat face — sharp hollow cylinder look */}
+          <mesh position={[0, 0, -1.25]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
+        </group>
       </group>
     </group>
   )
