@@ -104,10 +104,11 @@ const ROTOR_OFFSETS = [
 ]
 
 // Shared camera geometry + materials (reused by ObliqueDrones too)
-export const CAMERA_BODY_GEO = new THREE.CylinderGeometry(2, 2, 2.5, 16, 1, false, 0, Math.PI)
+export const CAMERA_BODY_GEO = new THREE.BoxGeometry(3, 2.5, 3)
 export const CAMERA_BODY_MAT = new THREE.MeshStandardMaterial({ color: '#ff6644', emissive: '#ff3300', emissiveIntensity: 0.3 })
-export const CAMERA_LENS_GEO = new THREE.RingGeometry(0.9, 1.3, 24)
-export const CAMERA_LENS_MAT = new THREE.MeshStandardMaterial({ color: '#111111', side: THREE.DoubleSide })
+// Torus lens ring — has real depth so it's visible from the side, no z-fighting
+export const CAMERA_LENS_GEO = new THREE.TorusGeometry(1.0, 0.2, 8, 24)
+export const CAMERA_LENS_MAT = new THREE.MeshStandardMaterial({ color: '#111111' })
 
 export default function Drone({ visible, hovering, animating, showPath, positionRef, profileNadir, profileOblique }) {
   const meshRef = useRef()
@@ -250,9 +251,8 @@ export default function Drone({ visible, hovering, animating, showPath, position
       const bobY = Math.sin(t * 1.5) * 3
       meshRef.current.position.set(PROFILE_POS.x, PROFILE_POS.y + bobY, PROFILE_POS.z)
       if (positionRef) positionRef.current = meshRef.current.position
-      // Fixed yaw so the right side faces the viewer camera (which is at +X offset)
-      // Drone faces -X direction so viewer sees right profile
-      meshRef.current.rotation.set(wind.pitch, -Math.PI / 2, wind.roll)
+      // Fixed yaw=0: drone faces -Z, so its right side faces +X (where viewer camera is)
+      meshRef.current.rotation.set(wind.pitch, 0, wind.roll)
 
       // Camera pitch animation
       if (profileAnimActiveRef.current && cameraGimbalRef.current) {
@@ -402,10 +402,10 @@ export default function Drone({ visible, hovering, animating, showPath, position
         ))}
         {/* Camera gimbal — pitches independently */}
         <group ref={cameraGimbalRef} position={[0, -1.5, -5]}>
-          {/* Half-cylinder camera body — flat face forward */}
-          <mesh rotation={[Math.PI / 2, 0, 0]} geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
-          {/* Lens ring on flat face — sharp hollow cylinder look */}
-          <mesh position={[0, 0, -1.25]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
+          {/* Small cube camera body */}
+          <mesh geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
+          {/* Torus lens ring — extruded outward so visible from side, no z-fighting */}
+          <mesh position={[0, 0, -1.7]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
         </group>
       </group>
     </group>

@@ -86,7 +86,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       if (controlsRef.current) controlsRef.current.enabled = true
     }
 
-    if ((currentStage === 2 || currentStage === 6) && prev !== currentStage) {
+    if ((currentStage === 1 || currentStage === 6) && prev !== currentStage) {
       // Profile view: viewer camera to the right side of the drone
       goalPos = new THREE.Vector3(
         PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
