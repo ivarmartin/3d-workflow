@@ -97,6 +97,14 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       duration = 1.5
       autoRotateAfter = false
 
+    } else if (prev === 1 && currentStage !== 1) {
+      // Leaving nadir profile — reset orbit target back to scene center
+      // (stage 1 moved it to the drone's hover position)
+      goalPos = camera.position.clone()
+      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
+      duration = 0.5
+      autoRotateAfter = false
+
     } else if (currentStage === 6 && prev !== 6) {
       // Oblique profile: drone reappears at fixed position, fly camera to side view
       goalPos = new THREE.Vector3(
