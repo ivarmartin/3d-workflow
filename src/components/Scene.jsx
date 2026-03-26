@@ -90,7 +90,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       // Profile view: viewer camera to the right side of the drone
       goalPos = new THREE.Vector3(
         PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
-        PROFILE_DRONE_POS.y + 5,
+        PROFILE_DRONE_POS.y - 10,
         PROFILE_DRONE_POS.z
       )
       goalTarget = PROFILE_DRONE_POS.clone()

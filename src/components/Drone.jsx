@@ -281,12 +281,16 @@ export default function Drone({ visible, hovering, animating, showPath, position
       hoverPos.y += bobY
       meshRef.current.position.copy(hoverPos)
       if (positionRef) positionRef.current = meshRef.current.position
-      // Face the camera (yaw only, stay level)
+      // Face the camera (+PI so front/-Z faces toward user, not away)
       const camDir = camera.position.clone().sub(meshRef.current.position)
-      const yaw = Math.atan2(camDir.x, camDir.z)
-      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
+      const baseYaw = Math.atan2(camDir.x, camDir.z) + Math.PI
 
-      // Idle camera look-around
+      // Organic drone body scanning — slow yaw + pitch shifts like a sentient droid
+      const scanYaw = Math.sin(t * 0.35) * 0.12 + Math.sin(t * 0.8 + 1.5) * 0.06
+      const scanPitch = Math.sin(t * 0.28 + 0.7) * 0.08 + Math.sin(t * 0.65 + 2.3) * 0.04
+      meshRef.current.rotation.set(wind.pitch + scanPitch, baseYaw + scanYaw, wind.roll)
+
+      // Camera gimbal look-around — more pronounced, scanning user up and down
       if (cameraGimbalRef.current) {
         const look = cameraLookNoise(t)
         cameraGimbalRef.current.rotation.set(look.pitch, look.yaw, 0)
