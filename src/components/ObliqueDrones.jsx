@@ -325,8 +325,8 @@ export default function ObliqueDrones({ url, state, fadeDuration = 2 }) {
             ))}
             {/* Camera gimbal — pre-pitched to oblique 45° */}
             <group position={[0, -1.5, -5]} rotation={[-Math.PI / 4, 0, 0]}>
-              <mesh rotation={[Math.PI / 2, 0, 0]} geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
-              <mesh position={[0, 0, -1.25]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
+              <mesh geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
+              <mesh position={[0, 0, -1.7]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
             </group>
           </group>
         </group>

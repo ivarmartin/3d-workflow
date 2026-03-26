@@ -6,13 +6,13 @@ export const STAGES = [
   },
   {
     id: 1,
-    name: 'Drone Flight',
-    description: 'Let\u00b4s have the drone take flight! It follows a lawnmower pattern to capture overlapping images  - you can see how it leaves a trail of camera positions as it flies.',
+    name: 'Nadir Camera',
+    description: 'The drone\u2019s camera tilts to point straight down \u2014 this is called nadir. Nadir photos are ideal for creating accurate 2D maps and orthomosaics, capturing the ground directly below the drone.',
   },
   {
     id: 2,
-    name: 'Nadir Camera',
-    description: 'The drone\u2019s camera tilts to point straight down \u2014 this is called nadir. Nadir photos are ideal for creating accurate 2D maps and orthomosaics, capturing the ground directly below the drone.',
+    name: 'Drone Flight',
+    description: 'Let\u00b4s have the drone take flight! It follows a lawnmower pattern to capture overlapping images  - you can see how it leaves a trail of camera positions as it flies.',
   },
   {
     id: 3,
@@ -64,9 +64,9 @@ export function getVisibility(stage) {
   return {
     drone:              stage <= 2 || stage === 6,
     droneHovering:      stage === 0,
-    droneAnimating:     stage === 1,
-    dronePath:          stage === 1,
-    droneProfileNadir:  stage === 2,
+    droneAnimating:     stage === 2,
+    dronePath:          stage === 2,
+    droneProfileNadir:  stage === 1,
     droneProfileOblique: stage === 6,
     groundPlane:        stage <= 3 ? 'visible' : stage === 4 ? 'fadeOut' : undefined,
     // Nadir cameras fade in at stage 3, visible at stage 4 (faded out after map via Scene.jsx), hidden from stage 5+
