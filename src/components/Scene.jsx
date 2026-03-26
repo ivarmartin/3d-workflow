@@ -86,8 +86,19 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       if (controlsRef.current) controlsRef.current.enabled = true
     }
 
-    if ((currentStage === 1 || currentStage === 6) && prev !== currentStage) {
-      // Profile view: viewer camera to the right side of the drone
+    if (currentStage === 1 && prev !== 1) {
+      // Nadir profile: drone stays in place and rotates — just lower the camera
+      // a bit so user can see the camera underneath the drone
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+      const dronePos = camera.position.clone().add(forward.multiplyScalar(80)) // HOVER_DISTANCE
+      goalPos = camera.position.clone()
+      goalPos.y -= 15
+      goalTarget = dronePos.clone()
+      duration = 1.5
+      autoRotateAfter = false
+
+    } else if (currentStage === 6 && prev !== 6) {
+      // Oblique profile: drone reappears at fixed position, fly camera to side view
       goalPos = new THREE.Vector3(
         PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
         PROFILE_DRONE_POS.y - 10,
