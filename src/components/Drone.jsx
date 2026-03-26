@@ -135,6 +135,12 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const prevProfileNadirRef = useRef(false)
   const prevProfileObliqueRef = useRef(false)
 
+  // Nadir profile: drone stays in place and rotates to show side
+  const profileNadirPosRef = useRef(new THREE.Vector3()) // captured hover position
+  const profileNadirBaseYawRef = useRef(0)                // yaw when facing user
+  const profileYawRef = useRef(0)                         // current animated yaw
+  const profileYawAnimStartRef = useRef(0)
+
   // Departure animation state
   const departCurveRef = useRef(null)
   const departLengthRef = useRef(0)
@@ -219,6 +225,13 @@ export default function Drone({ visible, hovering, animating, showPath, position
 
     // Detect profile stage transitions — start pitch animations
     if (profileNadir && !prevProfileNadirRef.current) {
+      // Capture current hover position and yaw — drone stays in place and rotates
+      profileNadirPosRef.current.copy(meshRef.current.position)
+      const camDir = camera.position.clone().sub(meshRef.current.position)
+      profileNadirBaseYawRef.current = Math.atan2(camDir.x, camDir.z) + Math.PI
+      profileYawRef.current = profileNadirBaseYawRef.current
+      profileYawAnimStartRef.current = timeRef.current
+
       phaseRef.current = 'hover'
       profileAnimFromRef.current = PITCH_FORWARD
       profileAnimToRef.current = PITCH_NADIR
@@ -246,8 +259,42 @@ export default function Drone({ visible, hovering, animating, showPath, position
     const t = timeRef.current
     const wind = windNoise(t)
 
-    // Profile stages: hover at fixed world position with fixed yaw
-    if (profileNadir || profileOblique) {
+    // Nadir profile: drone stays at captured hover position, rotates to show right side
+    if (profileNadir) {
+      const bobY = Math.sin(t * 1.5) * 3
+      meshRef.current.position.set(
+        profileNadirPosRef.current.x,
+        profileNadirPosRef.current.y + bobY,
+        profileNadirPosRef.current.z
+      )
+      if (positionRef) positionRef.current = meshRef.current.position
+
+      // Animate yaw: rotate 90° to show right side (PI/2 counter-clockwise)
+      const yawElapsed = t - profileYawAnimStartRef.current
+      const yawDuration = 1.5
+      const yp = Math.min(yawElapsed / yawDuration, 1)
+      const yawEase = yp < 0.5 ? 4 * yp * yp * yp : 1 - Math.pow(-2 * yp + 2, 3) / 2
+      const targetYaw = profileNadirBaseYawRef.current + Math.PI / 2
+      profileYawRef.current = profileNadirBaseYawRef.current + (targetYaw - profileNadirBaseYawRef.current) * yawEase
+      meshRef.current.rotation.set(wind.pitch, profileYawRef.current, wind.roll)
+
+      // Camera pitch animation
+      if (profileAnimActiveRef.current && cameraGimbalRef.current) {
+        const elapsed = t - profileAnimStartRef.current
+        const duration = 2.0
+        const p = Math.min(elapsed / duration, 1)
+        const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
+        cameraPitchRef.current = profileAnimFromRef.current + (profileAnimToRef.current - profileAnimFromRef.current) * ease
+        if (p >= 1) profileAnimActiveRef.current = false
+      }
+      if (cameraGimbalRef.current) {
+        cameraGimbalRef.current.rotation.set(cameraPitchRef.current, 0, 0)
+      }
+      return
+    }
+
+    // Oblique profile: drone appears at fixed world position (reappears after being hidden)
+    if (profileOblique) {
       const bobY = Math.sin(t * 1.5) * 3
       meshRef.current.position.set(PROFILE_POS.x, PROFILE_POS.y + bobY, PROFILE_POS.z)
       if (positionRef) positionRef.current = meshRef.current.position
@@ -259,7 +306,6 @@ export default function Drone({ visible, hovering, animating, showPath, position
         const elapsed = t - profileAnimStartRef.current
         const duration = 2.0
         const p = Math.min(elapsed / duration, 1)
-        // Cubic ease-in-out
         const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
         cameraPitchRef.current = profileAnimFromRef.current + (profileAnimToRef.current - profileAnimFromRef.current) * ease
         if (p >= 1) profileAnimActiveRef.current = false
