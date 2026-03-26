@@ -2,6 +2,7 @@ import { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Line, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { CAMERA_BODY_GEO, CAMERA_BODY_MAT, CAMERA_LENS_GEO, CAMERA_LENS_MAT } from './Drone'
 
 // 4 oblique flight directions relative to nadir (136°)
 const FLIGHT_ANGLES = [136, 316, 226, 46] // degrees
@@ -322,6 +323,11 @@ export default function ObliqueDrones({ url, state, fadeDuration = 2 }) {
                 material={ROTOR_MAT}
               />
             ))}
+            {/* Camera gimbal — pre-pitched to oblique 45° */}
+            <group position={[0, -1.5, -5]} rotation={[-Math.PI / 4, 0, 0]}>
+              <mesh rotation={[Math.PI / 2, 0, 0]} geometry={CAMERA_BODY_GEO} material={CAMERA_BODY_MAT} />
+              <mesh position={[0, 0, -1.25]} geometry={CAMERA_LENS_GEO} material={CAMERA_LENS_MAT} />
+            </group>
           </group>
         </group>
       ))}
