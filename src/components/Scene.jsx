@@ -87,33 +87,40 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
     }
 
     if (currentStage === 1 && prev !== 1) {
-      // Nadir profile: drone stays in place and rotates — just lower the camera
-      // a bit so user can see the camera underneath the drone
+      // Nadir profile: drone stays in place and rotates — lower the camera
+      // so user can clearly see the drone and its camera from below
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
       const dronePos = camera.position.clone().add(forward.multiplyScalar(80)) // HOVER_DISTANCE
       goalPos = camera.position.clone()
-      goalPos.y -= 15
+      goalPos.y -= 25
       goalTarget = dronePos.clone()
       duration = 1.5
-      autoRotateAfter = false
+      autoRotateAfter = true
 
     } else if (prev === 1 && currentStage !== 1) {
       // Leaving nadir profile — reset orbit target back to scene center
-      // (stage 1 moved it to the drone's hover position)
+      // and stop auto-rotate (stage 1 moved target to drone hover position)
       goalPos = camera.position.clone()
       goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
       duration = 0.5
       autoRotateAfter = false
 
     } else if (currentStage === 6 && prev !== 6) {
-      // Oblique profile: drone reappears at fixed position, fly camera to side view
+      // Oblique profile: drone reappears at fixed position, fly camera to side view below
       goalPos = new THREE.Vector3(
         PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
-        PROFILE_DRONE_POS.y - 10,
+        PROFILE_DRONE_POS.y - 20,
         PROFILE_DRONE_POS.z
       )
       goalTarget = PROFILE_DRONE_POS.clone()
       duration = 2.0
+      autoRotateAfter = true
+
+    } else if (prev === 6 && currentStage !== 6) {
+      // Leaving oblique profile — reset orbit target back to scene center
+      goalPos = camera.position.clone()
+      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
+      duration = 0.5
       autoRotateAfter = false
 
     } else if (currentStage === 4 && prev !== 4) {
