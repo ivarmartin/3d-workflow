@@ -41,8 +41,17 @@ const PITCH_FORWARD = 0
 const PITCH_NADIR = -Math.PI / 2
 const PITCH_OBLIQUE = -Math.PI / 4
 
-// Profile hover position (above scene center)
-const PROFILE_POS = new THREE.Vector3(-30, 100, -22)
+// Nadir profile: precomputed drone hover position from default camera [-30, 500, 600]
+// looking at scene center [-30, 4, -22], 80 units (HOVER_DISTANCE) in front.
+const NADIR_PROFILE_POS = (() => {
+  const camPos = new THREE.Vector3(-30, 500, 600)
+  const sceneCenter = new THREE.Vector3(-30, 4, -22)
+  const dir = sceneCenter.clone().sub(camPos).normalize()
+  return camPos.clone().add(dir.multiplyScalar(80))
+})()
+
+// Oblique profile hover position (above scene center)
+const OBLIQUE_PROFILE_POS = new THREE.Vector3(-30, 100, -22)
 
 // Generate a lawnmower grid path rotated to align with the nadir camera strips
 // Camera strips run ~50° from vertical (upper-left to lower-right)
@@ -248,8 +257,9 @@ export default function Drone({ visible, hovering, animating, showPath, position
 
     // Profile stages: drone at fixed world position, right side facing viewer
     if (profileNadir || profileOblique) {
+      const profilePos = profileNadir ? NADIR_PROFILE_POS : OBLIQUE_PROFILE_POS
       const bobY = Math.sin(t * 1.5) * 3
-      meshRef.current.position.set(PROFILE_POS.x, PROFILE_POS.y + bobY, PROFILE_POS.z)
+      meshRef.current.position.set(profilePos.x, profilePos.y + bobY, profilePos.z)
       if (positionRef) positionRef.current = meshRef.current.position
       // Fixed yaw=0: drone faces -Z, so its right side faces +X (where viewer camera is)
       meshRef.current.rotation.set(wind.pitch, 0, wind.roll)

@@ -43,7 +43,16 @@ const SPIRAL_END_DIST = 900      // end further out
 const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
 const SPIRAL_END_ELEV = 40       // degrees — end higher
 
-// Profile view: drone hovers at this position, camera views from the side
+// Nadir profile: precomputed drone hover position from the default camera [-30, 500, 600]
+// looking at SCENE_CENTER. Drone is 80 units in front along that direction.
+const DEFAULT_CAM_POS = new THREE.Vector3(-30, 500, 600)
+const NADIR_PROFILE_DRONE_POS = (() => {
+  const dir = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
+    .sub(DEFAULT_CAM_POS).normalize()
+  return DEFAULT_CAM_POS.clone().add(dir.multiplyScalar(80))
+})()
+
+// Oblique profile: drone appears at this fixed position (above scene center)
 const PROFILE_DRONE_POS = new THREE.Vector3(-30, 100, -22)
 const PROFILE_SIDE_OFFSET = 60   // how far the viewer camera sits to the side
 
@@ -96,11 +105,11 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       autoRotateAfter = true
 
     } else if (currentStage === 1) {
-      // Nadir profile: just lower the camera slightly from wherever it is,
-      // no big zoom. Orbit target is the drone's fixed profile position.
-      goalPos = camera.position.clone()
+      // Nadir profile: lower camera 25m from default orbit, look at
+      // precomputed drone hover position. Subtle transition — drone is close.
+      goalPos = DEFAULT_CAM_POS.clone()
       goalPos.y -= 25
-      goalTarget = PROFILE_DRONE_POS.clone()
+      goalTarget = NADIR_PROFILE_DRONE_POS.clone()
       duration = 1.5
       autoRotateAfter = true
 
