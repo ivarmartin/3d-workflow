@@ -66,6 +66,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
     if (!controlsRef.current) return
     const prev = prevStageRef.current
     prevStageRef.current = currentStage
+    if (prev === currentStage) return
 
     const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
     const aspect = size.width / size.height
@@ -80,51 +81,33 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
     let autoRotateAfter = false
 
     // Stop spiral if leaving stage 8
-    if (prev === 8 && currentStage !== 8 && spiralRef.current) {
+    if (prev === 8 && spiralRef.current) {
       spiralRef.current = false
       animatingRef.current = false
       if (controlsRef.current) controlsRef.current.enabled = true
     }
 
-    if (currentStage === 1 && prev !== 1) {
-      // Nadir profile: drone stays in place and rotates — lower the camera
-      // so user can clearly see the drone and its camera from below
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-      const dronePos = camera.position.clone().add(forward.multiplyScalar(80)) // HOVER_DISTANCE
-      goalPos = camera.position.clone()
-      goalPos.y -= 25
-      goalTarget = dronePos.clone()
+    // Every stage has a fixed camera position — consistent regardless of direction
+    if (currentStage === 0 || currentStage === 2 || currentStage === 3) {
+      // Default orbit view (initial camera position)
+      goalPos = new THREE.Vector3(-30, 500, 600)
+      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
       duration = 1.5
       autoRotateAfter = true
 
-    } else if (prev === 1 && currentStage !== 1) {
-      // Leaving nadir profile — reset orbit target back to scene center
-      // and stop auto-rotate (stage 1 moved target to drone hover position)
-      goalPos = camera.position.clone()
-      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
-      duration = 0.5
-      autoRotateAfter = false
-
-    } else if (currentStage === 6 && prev !== 6) {
-      // Oblique profile: drone reappears at fixed position, fly camera to side view below
+    } else if (currentStage === 1) {
+      // Nadir profile: fixed position below drone at PROFILE_DRONE_POS
       goalPos = new THREE.Vector3(
         PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
-        PROFILE_DRONE_POS.y - 20,
+        PROFILE_DRONE_POS.y - 25,
         PROFILE_DRONE_POS.z
       )
       goalTarget = PROFILE_DRONE_POS.clone()
-      duration = 2.0
+      duration = 1.5
       autoRotateAfter = true
 
-    } else if (prev === 6 && currentStage !== 6) {
-      // Leaving oblique profile — reset orbit target back to scene center
-      goalPos = camera.position.clone()
-      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
-      duration = 0.5
-      autoRotateAfter = false
-
-    } else if (currentStage === 4 && prev !== 4) {
-      // Stage 4 (was 3): top-down map view
+    } else if (currentStage === 4) {
+      // Top-down map view
       let fitDimension
       if (isPortrait) {
         const verticalFit = (MAP_HALF_ALONG * 2 * 1.15) / (2 * Math.tan(fovRad / 2))
@@ -149,8 +132,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       goalTarget = target.clone()
       autoRotateAfter = false
 
-    } else if (currentStage === 5 && prev !== 5) {
-      // Stage 5 (was 4): flat plane view — near side-on (~10° elevation) to show map is flat
+    } else if (currentStage === 5) {
+      // Flat plane view — near side-on (~10° elevation)
       const elevAngle = 10 * (Math.PI / 180)
       const distance = 1200
 
@@ -167,8 +150,19 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       duration = 2.0
       autoRotateAfter = true
 
-    } else if (currentStage === 7 && prev !== 7) {
-      // Stage 7 (was 5): oblique cameras — 45° looking down, zoomed out to see full grids
+    } else if (currentStage === 6) {
+      // Oblique profile: fixed position below drone at PROFILE_DRONE_POS
+      goalPos = new THREE.Vector3(
+        PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
+        PROFILE_DRONE_POS.y - 20,
+        PROFILE_DRONE_POS.z
+      )
+      goalTarget = PROFILE_DRONE_POS.clone()
+      duration = 2.0
+      autoRotateAfter = true
+
+    } else if (currentStage === 7) {
+      // Oblique cameras — 45° looking down, zoomed out
       const elevAngle = 45 * (Math.PI / 180)
       const distance = 1600
 
@@ -185,8 +179,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       duration = 2.0
       autoRotateAfter = false
 
-    } else if (currentStage === 8 && prev !== 8) {
-      // Stage 8 (was 6): point cloud — spiral camera outward while points reveal
+    } else if (currentStage === 8) {
+      // Point cloud — spiral camera outward while points reveal
       const startElev = SPIRAL_START_ELEV * (Math.PI / 180)
       const hDist = SPIRAL_START_DIST * Math.cos(startElev)
       const camY = SPIRAL_START_DIST * Math.sin(startElev)
@@ -202,9 +196,10 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
         target.z + Math.sin(currentAngle) * hDist
       )
       goalTarget = target.clone()
-      duration = 3 // fly-in duration before spiral starts
+      duration = 3
       autoRotateAfter = false
     }
+    // Stages 9, 10: no camera animation (free exploration)
 
     if (goalPos) {
       startPosRef.current.copy(camera.position)
