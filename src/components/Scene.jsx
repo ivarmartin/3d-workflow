@@ -96,12 +96,10 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       autoRotateAfter = true
 
     } else if (currentStage === 1) {
-      // Nadir profile: fixed position below drone at PROFILE_DRONE_POS
-      goalPos = new THREE.Vector3(
-        PROFILE_DRONE_POS.x + PROFILE_SIDE_OFFSET,
-        PROFILE_DRONE_POS.y - 25,
-        PROFILE_DRONE_POS.z
-      )
+      // Nadir profile: just lower the camera slightly from wherever it is,
+      // no big zoom. Orbit target is the drone's fixed profile position.
+      goalPos = camera.position.clone()
+      goalPos.y -= 25
       goalTarget = PROFILE_DRONE_POS.clone()
       duration = 1.5
       autoRotateAfter = true
