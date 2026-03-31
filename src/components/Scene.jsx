@@ -48,7 +48,7 @@ const PROFILE_DRONE_POS = new THREE.Vector3(-30, 100, -22)
 const PROFILE_SIDE_OFFSET = 60   // how far the viewer camera sits to the side
 
 // CameraAnimator — smoothly flies camera for stage transitions
-function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
+function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositionRef }) {
   const { camera, size } = useThree()
   const animatingRef = useRef(false)
   const progressRef = useRef(0)
@@ -88,7 +88,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
     }
 
     // Every stage has a fixed camera position — consistent regardless of direction
-    if (currentStage === 0 || currentStage === 2 || currentStage === 3) {
+    if (currentStage === 0 || currentStage === 3) {
       // Default orbit view (initial camera position)
       goalPos = new THREE.Vector3(-30, 500, 600)
       goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
@@ -96,11 +96,27 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart }) {
       autoRotateAfter = true
 
     } else if (currentStage === 1) {
-      // Nadir profile: just lower the camera slightly from wherever it is,
-      // no big zoom. Orbit target is the drone's fixed profile position.
-      goalPos = camera.position.clone()
-      goalPos.y -= 25
-      goalTarget = PROFILE_DRONE_POS.clone()
+      // Nadir profile: orbit to side-view the drone where it's already hovering
+      const dronePos = dronePositionRef.current
+        ? dronePositionRef.current.clone()
+        : camera.position.clone().add(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(80))
+      // Snap orbit target to drone immediately so it stays centered during animation
+      controlsRef.current.target.copy(dronePos)
+      controlsRef.current.update()
+      // Camera moves to +X side of the drone (right side), slightly below
+      goalPos = new THREE.Vector3(
+        dronePos.x + PROFILE_SIDE_OFFSET,
+        dronePos.y - 50,
+        dronePos.z
+      )
+      goalTarget = dronePos.clone()
+      duration = 1.5
+      autoRotateAfter = true
+
+    } else if (currentStage === 2) {
+      // Drone flight: zoom out to show lawnmower grid
+      goalPos = new THREE.Vector3(-30, 500, 600)
+      goalTarget = new THREE.Vector3(SCENE_CENTER[0], SCENE_CENTER[1], SCENE_CENTER[2])
       duration = 1.5
       autoRotateAfter = true
 
@@ -420,7 +436,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
       />
       <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} />
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
-      <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} />
+      <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} dronePositionRef={dronePositionRef} />
       <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
       <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
       <FadeModel url={MODELS.mesh} state={visibility.mesh} />

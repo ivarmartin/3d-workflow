@@ -75,7 +75,7 @@ export default function StageUI({
           opacity: 0.7,
           marginBottom: 4,
         }}>
-          Stage {currentStage + 1} of {STAGES.length}
+          Stage {currentStage} of {STAGES.length - 1}
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.02em' }}>
           {stage.name}

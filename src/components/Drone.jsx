@@ -134,6 +134,9 @@ export default function Drone({ visible, hovering, animating, showPath, position
   const profileAnimToRef = useRef(0)
   const prevProfileNadirRef = useRef(false)
   const prevProfileObliqueRef = useRef(false)
+  const frozenProfilePosRef = useRef(new THREE.Vector3())
+  const frozenYawRef = useRef(0)
+  const yawAnimStartRef = useRef(0)
 
   // Departure animation state
   const departCurveRef = useRef(null)
@@ -219,6 +222,11 @@ export default function Drone({ visible, hovering, animating, showPath, position
 
     // Detect profile stage transitions — start pitch animations
     if (profileNadir && !prevProfileNadirRef.current) {
+      // Freeze the drone at its current hover position (no teleport)
+      frozenProfilePosRef.current.copy(meshRef.current.position)
+      // Store current yaw so we can smoothly interpolate to profile yaw
+      frozenYawRef.current = meshRef.current.rotation.y
+      yawAnimStartRef.current = timeRef.current
       phaseRef.current = 'hover'
       profileAnimFromRef.current = PITCH_FORWARD
       profileAnimToRef.current = PITCH_NADIR
@@ -249,10 +257,20 @@ export default function Drone({ visible, hovering, animating, showPath, position
     // Profile stages: drone at fixed world position, right side facing viewer
     if (profileNadir || profileOblique) {
       const bobY = Math.sin(t * 1.5) * 3
-      meshRef.current.position.set(PROFILE_POS.x, PROFILE_POS.y + bobY, PROFILE_POS.z)
+      // Nadir: stay at frozen hover position; Oblique: use fixed PROFILE_POS
+      const profilePos = profileNadir ? frozenProfilePosRef.current : PROFILE_POS
+      meshRef.current.position.set(profilePos.x, profilePos.y + bobY, profilePos.z)
       if (positionRef) positionRef.current = meshRef.current.position
-      // Fixed yaw=0: drone faces -Z, so its right side faces +X (where viewer camera is)
-      meshRef.current.rotation.set(wind.pitch, 0, wind.roll)
+      // Smoothly rotate to profile yaw (0 = facing -Z, right side faces +X)
+      let yaw = 0
+      if (profileNadir) {
+        const yawElapsed = t - yawAnimStartRef.current
+        const yawDuration = 1.5
+        const yawP = Math.min(yawElapsed / yawDuration, 1)
+        const yawEase = yawP < 0.5 ? 4 * yawP * yawP * yawP : 1 - Math.pow(-2 * yawP + 2, 3) / 2
+        yaw = frozenYawRef.current + (0 - frozenYawRef.current) * yawEase
+      }
+      meshRef.current.rotation.set(wind.pitch, yaw, wind.roll)
 
       // Camera pitch animation
       if (profileAnimActiveRef.current && cameraGimbalRef.current) {
