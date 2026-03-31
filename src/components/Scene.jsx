@@ -25,7 +25,7 @@ Object.values(MODELS).forEach((url) => useGLTF.preload(url))
 // Scene center (2D map center)
 const SCENE_CENTER = [-30, 4, -22]
 
-const GRAY_MATERIAL = new THREE.MeshStandardMaterial({ color: 0x999999 })
+const SANDY_BROWN_MATERIAL = new THREE.MeshStandardMaterial({ color: 0xC4A882 })
 
 // Map survey geometry (from Drone.jsx lawnmower grid)
 const MAP_CENTER = [-17, 0, -13] // cx, ground level, cz
@@ -116,8 +116,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       animatingRef.current = false
       if (controlsRef.current) controlsRef.current.enabled = true
     }
-    // Stop flyover if leaving stage 9
-    if (prev === 9 && flyoverRef.current) {
+    // Stop flyover if leaving stage 10
+    if (prev === 10 && flyoverRef.current) {
       flyoverRef.current = false
       if (controlsRef.current) controlsRef.current.enabled = true
     }
@@ -247,7 +247,26 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       if (onSpiralStart) onSpiralStart()
       return // skip the standard animation setup
     } else if (currentStage === 9) {
-      // Flyover: approach → fly across short axis → climb to orbit
+      // Mesh reveal: animate to 45° elevated orbit, then auto-rotate
+      const dx = camera.position.x - target.x
+      const dz = camera.position.z - target.z
+      const currentAngle = Math.atan2(dz, dx)
+
+      const endElev = FLYOVER_END_ELEV_DEG * (Math.PI / 180)
+      const hDist = FLYOVER_END_DIST * Math.cos(endElev)
+      const camY = FLYOVER_END_DIST * Math.sin(endElev)
+
+      goalPos = new THREE.Vector3(
+        target.x + Math.cos(currentAngle) * hDist,
+        camY,
+        target.z + Math.sin(currentAngle) * hDist
+      )
+      goalTarget = target.clone()
+      duration = 2.0
+      autoRotateAfter = true
+
+    } else if (currentStage === 10) {
+      // Texturing flyover: approach → fly across short axis → climb to orbit
       const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
       const shortDirX = Math.cos(shortAxisAngle)
       const shortDirZ = Math.sin(shortAxisAngle)
@@ -290,7 +309,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       controlsRef.current.autoRotate = false
       return
     }
-    // Stage 10: no camera animation (free exploration)
+    // Stage 11: no camera animation (free exploration)
 
     if (goalPos) {
       startPosRef.current.copy(camera.position)
@@ -501,22 +520,6 @@ export default function Scene({ visibility, darkMode, currentStage }) {
     }
   }, [currentStage])
 
-  // Stage 9 flyover: delay crossfade until approach completes (4s)
-  const [flyoverFadeReady, setFlyoverFadeReady] = useState(false)
-  const flyoverFadeTimerRef = useRef(null)
-  useEffect(() => {
-    if (currentStage === 9) {
-      setFlyoverFadeReady(false)
-      flyoverFadeTimerRef.current = setTimeout(() => setFlyoverFadeReady(true), FLYOVER_APPROACH * 1000)
-    } else {
-      setFlyoverFadeReady(false)
-      if (flyoverFadeTimerRef.current) clearTimeout(flyoverFadeTimerRef.current)
-    }
-    return () => {
-      if (flyoverFadeTimerRef.current) clearTimeout(flyoverFadeTimerRef.current)
-    }
-  }, [currentStage])
-
   useEffect(() => {
     if (currentStage === 4) {
       // Camera animation takes 1.5s; wait an extra 1s before showing the map
@@ -619,18 +622,29 @@ export default function Scene({ visibility, darkMode, currentStage }) {
           url={MODELS.pointCloud}
           state={
             visibility.pointCloud === 'fadeOut'
-              ? (flyoverFadeReady ? 'fadeOut' : 'visible')
+              ? 'fadeOut'
               : (spiralStarted ? visibility.pointCloud : undefined)
           }
-          fadeOutDuration={5}
+          fadeOutDuration={10}
         />
       </Suspense>
+      {/* Solid (untextured) mesh — fades in at stage 9, fades out at stage 10 */}
       <Suspense fallback={null}>
         <FadeModel
           url={MODELS.mesh}
-          state={visibility.mesh === 'fadeIn' ? (flyoverFadeReady ? 'fadeIn' : undefined) : visibility.mesh}
-          fadeDuration={5}
+          state={visibility.meshSolid}
+          fadeDuration={visibility.meshSolid === 'fadeIn' ? 10 : 4}
+          overrideMaterial={SANDY_BROWN_MATERIAL}
           warmupId="mesh"
+        />
+      </Suspense>
+      {/* Textured mesh — fades in during stage 10 approach, done before flight */}
+      <Suspense fallback={null}>
+        <FadeModel
+          url={MODELS.mesh}
+          state={visibility.meshTextured}
+          fadeDuration={4}
+          warmupId="meshTextured"
         />
       </Suspense>
     </>

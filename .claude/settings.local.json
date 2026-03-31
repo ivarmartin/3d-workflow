@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/git/3d-workflow/src -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js -o -name *.jsx \\\\\\))",
+      "Bash(find /d/git/3d-workflow -maxdepth 2 -type f \\\\\\(-name *.json -o -name *.config.* -o -name *.md \\\\\\))",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(ls -lh d:/git/3d-workflow/public/assets/*.glb)",
+      "Bash(ls -lh d:/git/3d-workflow/public/assets/260321-Sanda-*.glb)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)",
+      "Bash(find /d/git/3d-workflow/src -type f \\\\\\(-name *.jsx -o -name *.js -o -name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(npm install:*)"
+    ]
+  }
+}

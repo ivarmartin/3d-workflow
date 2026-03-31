@@ -7,7 +7,7 @@ export const STAGES = [
   {
     id: 1,
     name: 'Nadir Camera',
-    description: 'The drone\u2019s camera tilts to point straight down \u2014 this is called nadir. Nadir photos are ideal for creating accurate 2D maps and orthomosaics, capturing the ground directly below the drone.',
+    description: 'The drone\u2019s camera tilts to point straight down - this is called nadir. Nadir photos are ideal for creating accurate 2D maps and orthomosaics, capturing the ground directly below the drone.',
   },
   {
     id: 2,
@@ -32,7 +32,7 @@ export const STAGES = [
   {
     id: 6,
     name: 'Oblique Camera',
-    description: 'To capture 3D terrain, the camera tilts to a 45-degree oblique angle. These angled photos reveal the sides of buildings, cliffs and terrain slopes that straight-down nadir photos would miss \u2014 essential for building accurate 3D models.',
+    description: 'To capture 3D terrain, the camera tilts to a 45-degree oblique angle. These angled photos reveal the sides of buildings, cliffs and terrain slopes that straight-down nadir photos would miss - essential for building accurate 3D models.',
   },
   {
     id: 7,
@@ -47,10 +47,15 @@ export const STAGES = [
   {
     id: 9,
     name: 'Making a Mesh',
-    description: 'From the point cloud we can make a solid form by combining all the points into thousands or millions of tiny triangles. This becomes what we call a Mesh.',
+    description: 'From the point cloud we can make a solid form by combining all the points into thousands or millions of tiny triangles. This becomes what we call a Mesh (and this one has been simplified for online viewing).',
   },
   {
     id: 10,
+    name: 'Texturing',
+    description: 'The mesh on its own is just a blank shape. To make it look realistic, we drape the original drone photos over the surface as textures - like wrapping a 3D object in high-resolution wallpaper. The result is a photorealistic 3D model.',
+  },
+  {
+    id: 11,
     name: 'Gaussian Splat',
     description: 'Gaussian splat rendering \u2014 coming soon',
   },
@@ -72,9 +77,10 @@ export function getVisibility(stage) {
     // Nadir cameras fade in at stage 3, visible at stage 4 (faded out after map via Scene.jsx), hidden from stage 5+
     nadirCameras:       stage === 3 ? 'fadeIn' : stage === 4 ? 'visible' : undefined,
     map:                stage === 4 ? 'fadeIn' : (stage >= 5 && stage <= 7) ? 'visible' : stage === 8 ? 'fadeOut' : undefined,
-    obliqueCameras:     stage === 7 ? 'fadeIn' : stage >= 8 ? 'visible' : undefined,
+    obliqueCameras:     stage === 7 ? 'fadeIn' : stage === 8 ? 'visible' : undefined,
     pointCloud:         stage === 8 ? 'fadeIn' : stage === 9 ? 'fadeOut' : undefined,
-    mesh:               stage === 9 ? 'fadeIn' : stage >= 10 ? 'visible' : undefined,
-    splatPlaceholder:   stage === 10,
+    meshSolid:          stage === 9 ? 'fadeIn' : stage === 10 ? 'fadeOut' : undefined,
+    meshTextured:       stage === 10 ? 'fadeIn' : stage >= 11 ? 'visible' : undefined,
+    splatPlaceholder:   stage === 11,
   }
 }
