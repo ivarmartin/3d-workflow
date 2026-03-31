@@ -31,30 +31,45 @@ export default function ScaleBar3D({ state }) {
   const worldZ = MAP_CENTER_Z + localU * sin + localV * cos
 
   useFrame((_, delta) => {
-    if (!state || !groupRef.current) return
+    if (!groupRef.current) return
+
+    if (!state) {
+      // Keep mounted for pre-warming but ensure hidden
+      if (groupRef.current.visible) {
+        opacityRef.current = 0
+        groupRef.current.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.opacity = 0
+            child.material.depthWrite = false
+          }
+        })
+        groupRef.current.visible = false
+      }
+      return
+    }
 
     const prev = opacityRef.current
-    const target = (state === 'visible' || state === 'fadeIn') ? 1 : 0
     const speed = 1 / FADE_DURATION
 
     if (state === 'fadeIn') {
       opacityRef.current = Math.min(1, prev + delta * speed)
     } else if (state === 'fadeOut') {
       opacityRef.current = Math.max(0, prev - delta * speed)
+    } else if (state === 'visible') {
+      opacityRef.current = 1
     }
 
     if (opacityRef.current !== prev) {
       groupRef.current.traverse((child) => {
         if (child.isMesh && child.material) {
           child.material.opacity = opacityRef.current
+          child.material.depthWrite = opacityRef.current > 0.99
         }
       })
     }
 
     groupRef.current.visible = opacityRef.current > 0
   })
-
-  if (!state) return null
 
   return (
     <group
@@ -70,7 +85,8 @@ export default function ScaleBar3D({ state }) {
           emissive="#ffffff"
           emissiveIntensity={0.3}
           transparent
-          depthWrite
+          depthWrite={false}
+          opacity={0}
         />
       </mesh>
 
@@ -82,7 +98,8 @@ export default function ScaleBar3D({ state }) {
           emissive="#ffffff"
           emissiveIntensity={0.3}
           transparent
-          depthWrite
+          depthWrite={false}
+          opacity={0}
         />
       </mesh>
 
@@ -94,7 +111,8 @@ export default function ScaleBar3D({ state }) {
           emissive="#ffffff"
           emissiveIntensity={0.3}
           transparent
-          depthWrite
+          depthWrite={false}
+          opacity={0}
         />
       </mesh>
 

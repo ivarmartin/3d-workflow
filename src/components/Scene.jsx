@@ -368,9 +368,11 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
       setNadirHidden(false)
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
       if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
-      mapTimerRef.current = setTimeout(() => setMapReady(true), 2500)
-      // Nadir fadeout starts when map fade-in begins so they cross-fade together
-      nadirTimerRef.current = setTimeout(() => setNadirHidden(true), 2500)
+      // Single callback so React batches both state updates in one render
+      mapTimerRef.current = setTimeout(() => {
+        setMapReady(true)
+        setNadirHidden(true)
+      }, 2500)
     } else {
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
       if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)

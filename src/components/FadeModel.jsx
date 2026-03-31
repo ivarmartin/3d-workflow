@@ -23,6 +23,7 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
         child.material.transparent = true
         child.material.depthWrite = opacityRef.current > 0.99
         child.material.opacity = opacityRef.current
+        child.frustumCulled = false
       }
     })
     return clone
@@ -41,7 +42,15 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
       })
     } else if (!state) {
       opacityRef.current = 0
-      if (groupRef.current) groupRef.current.visible = false
+      // Keep group visible at opacity 0 so GPU compiles shaders and uploads
+      // textures on mount — avoids a frame stall on first real fade-in
+      if (groupRef.current) groupRef.current.visible = true
+      clonedScene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.opacity = 0
+          child.material.depthWrite = false
+        }
+      })
     }
   }, [state, clonedScene])
 
@@ -74,7 +83,7 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
   })
 
   return (
-    <group ref={groupRef} visible={!!state && state !== 'hidden'}>
+    <group ref={groupRef}>
       <primitive object={clonedScene} />
     </group>
   )
