@@ -231,7 +231,8 @@ export default function Drone({ visible, hovering, animating, showPath, position
       profileAnimFromRef.current = PITCH_FORWARD
       profileAnimToRef.current = PITCH_NADIR
       cameraPitchRef.current = PITCH_FORWARD
-      profileAnimStartRef.current = timeRef.current
+      // Delay gimbal animation so it starts after the viewer camera arrives
+      profileAnimStartRef.current = timeRef.current + 1.2
       profileAnimActiveRef.current = true
     }
     if (profileOblique && !prevProfileObliqueRef.current) {
@@ -239,7 +240,8 @@ export default function Drone({ visible, hovering, animating, showPath, position
       profileAnimFromRef.current = PITCH_NADIR
       profileAnimToRef.current = PITCH_OBLIQUE
       cameraPitchRef.current = PITCH_NADIR
-      profileAnimStartRef.current = timeRef.current
+      // Delay gimbal animation so it starts after the viewer camera arrives
+      profileAnimStartRef.current = timeRef.current + 2.5
       profileAnimActiveRef.current = true
     }
     prevProfileNadirRef.current = profileNadir
@@ -275,11 +277,16 @@ export default function Drone({ visible, hovering, animating, showPath, position
       // Camera pitch animation
       if (profileAnimActiveRef.current && cameraGimbalRef.current) {
         const elapsed = t - profileAnimStartRef.current
-        const duration = 2.0
-        const p = Math.min(elapsed / duration, 1)
-        const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
-        cameraPitchRef.current = profileAnimFromRef.current + (profileAnimToRef.current - profileAnimFromRef.current) * ease
-        if (p >= 1) profileAnimActiveRef.current = false
+        if (elapsed >= 0) {
+          const duration = 3.0
+          const p = Math.min(elapsed / duration, 1)
+          // "Back" easeOut — overshoots past target then settles back
+          const c1 = 1.70158
+          const c3 = c1 + 1
+          const ease = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2)
+          cameraPitchRef.current = profileAnimFromRef.current + (profileAnimToRef.current - profileAnimFromRef.current) * ease
+          if (p >= 1) profileAnimActiveRef.current = false
+        }
       }
       if (cameraGimbalRef.current) {
         cameraGimbalRef.current.rotation.set(cameraPitchRef.current, 0, 0)

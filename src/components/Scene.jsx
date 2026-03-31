@@ -177,7 +177,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
         PROFILE_DRONE_POS.z
       )
       goalTarget = PROFILE_DRONE_POS.clone()
-      duration = 2.0
+      duration = 3.0
       autoRotateAfter = true
 
     } else if (currentStage === 7) {
