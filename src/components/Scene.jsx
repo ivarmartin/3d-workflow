@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, Suspense } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -7,7 +7,6 @@ import Drone from './Drone'
 import NadirCameras from './NadirCameras'
 import ObliqueDrones from './ObliqueDrones'
 import PointCloudRevealer from './PointCloudRevealer'
-import GroundPlane from './GroundPlane'
 import ScaleBar3D from './ScaleBar3D'
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
@@ -35,13 +34,17 @@ const MAP_HALF_ACROSS = 133      // half-width along short axis (266m total)
 const MAP_ANGLE_DEG = 136        // rotation of long axis in degrees
 const MAP_ANGLE_RAD = MAP_ANGLE_DEG * (Math.PI / 180)
 
-// Stage 8 spiral camera config (was stage 6)
-const SPIRAL_DURATION = 13       // seconds
+// Stage 8 spiral camera config — single unified animation
+const SPIRAL_DURATION = 20       // total seconds
 const SPIRAL_ROTATIONS = 1       // full 360° rotations
-const SPIRAL_START_DIST = 300    // start close
+const SPIRAL_CLOSE_DIST = 300    // closest point
 const SPIRAL_END_DIST = 900      // end further out
-const SPIRAL_START_ELEV = 25     // degrees — start low, looking inward
+const SPIRAL_CLOSE_ELEV = 25     // degrees — low when close
 const SPIRAL_END_ELEV = 40       // degrees — end higher
+// Phase boundaries (fractions of total duration)
+const SPIRAL_DIVE_END = 0.15     // 0→3s: fly in close
+const SPIRAL_HOLD_END = 0.35     // 3→7s: hold close
+// 7→20s: spiral out
 
 // Profile view: drone hovers at this position, camera views from the side
 const PROFILE_DRONE_POS = new THREE.Vector3(-30, 100, -22)
@@ -61,6 +64,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
   const postAnimAutoRotateRef = useRef(false)
   const spiralRef = useRef(false)       // true when doing spiral anim
   const spiralStartAngle = useRef(0)    // starting horizontal angle
+  const spiralStartDist = useRef(0)     // starting distance from target
+  const spiralStartElev = useRef(0)     // starting elevation angle
 
   useEffect(() => {
     if (!controlsRef.current) return
@@ -194,24 +199,23 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       autoRotateAfter = false
 
     } else if (currentStage === 8) {
-      // Point cloud — spiral camera outward while points reveal
-      const startElev = SPIRAL_START_ELEV * (Math.PI / 180)
-      const hDist = SPIRAL_START_DIST * Math.cos(startElev)
-      const camY = SPIRAL_START_DIST * Math.sin(startElev)
-
+      // Point cloud — unified spiral: fly-in while already rotating
       const dx = camera.position.x - target.x
       const dz = camera.position.z - target.z
-      const currentAngle = Math.atan2(dz, dx)
-      spiralStartAngle.current = currentAngle
+      const currentDist = Math.sqrt(dx * dx + camera.position.y * camera.position.y + dz * dz)
+      const currentElev = Math.atan2(camera.position.y, Math.sqrt(dx * dx + dz * dz))
 
-      goalPos = new THREE.Vector3(
-        target.x + Math.cos(currentAngle) * hDist,
-        camY,
-        target.z + Math.sin(currentAngle) * hDist
-      )
-      goalTarget = target.clone()
-      duration = 3
-      autoRotateAfter = false
+      spiralStartAngle.current = Math.atan2(dz, dx)
+      spiralStartDist.current = currentDist
+      spiralStartElev.current = currentElev
+
+      // Go straight into spiral — no fly-in phase
+      spiralRef.current = true
+      progressRef.current = 0
+      controlsRef.current.enabled = false
+      controlsRef.current.autoRotate = false
+      if (onSpiralStart) onSpiralStart()
+      return // skip the standard animation setup
     }
     // Stages 9, 10: no camera animation (free exploration)
 
@@ -250,13 +254,33 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       }
 
       const t = progressRef.current
-      // Ease out for smooth deceleration
-      const ease = 1 - Math.pow(1 - t, 2)
+      // Linear rotation so it matches auto-rotate speed seamlessly
+      const angle = spiralStartAngle.current + t * SPIRAL_ROTATIONS * Math.PI * 2
 
-      const angle = spiralStartAngle.current + ease * SPIRAL_ROTATIONS * Math.PI * 2
-      const dist = SPIRAL_START_DIST + (SPIRAL_END_DIST - SPIRAL_START_DIST) * ease
-      const elevDeg = SPIRAL_START_ELEV + (SPIRAL_END_ELEV - SPIRAL_START_ELEV) * ease
-      const elev = elevDeg * (Math.PI / 180)
+      // Three-phase distance: dive in (0→DIVE_END), hold close (DIVE_END→HOLD_END), spiral out (HOLD_END→1)
+      let dist, elev
+      const closeElev = SPIRAL_CLOSE_ELEV * (Math.PI / 180)
+      const endElev = SPIRAL_END_ELEV * (Math.PI / 180)
+      // Smooth ease-in-out cubic
+      const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+
+      if (t < SPIRAL_DIVE_END) {
+        // Dive in close
+        const diveT = t / SPIRAL_DIVE_END
+        const e = easeInOut(diveT)
+        dist = spiralStartDist.current + (SPIRAL_CLOSE_DIST - spiralStartDist.current) * e
+        elev = spiralStartElev.current + (closeElev - spiralStartElev.current) * e
+      } else if (t < SPIRAL_HOLD_END) {
+        // Hold close — stay at close distance/elevation
+        dist = SPIRAL_CLOSE_DIST
+        elev = closeElev
+      } else {
+        // Spiral out slowly
+        const outT = (t - SPIRAL_HOLD_END) / (1 - SPIRAL_HOLD_END)
+        const e = easeInOut(outT)
+        dist = SPIRAL_CLOSE_DIST + (SPIRAL_END_DIST - SPIRAL_CLOSE_DIST) * e
+        elev = closeElev + (endElev - closeElev) * e
+      }
 
       const hDist = dist * Math.cos(elev)
       const camY = dist * Math.sin(elev)
@@ -278,14 +302,6 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
     if (progressRef.current >= 1) {
       progressRef.current = 1
       animatingRef.current = false
-
-      // If stage 8 fly-in just finished, start the spiral
-      if (prevStageRef.current === 8) {
-        spiralRef.current = true
-        progressRef.current = 0
-        if (onSpiralStart) onSpiralStart()
-        return
-      }
 
       if (controlsRef.current) {
         controlsRef.current.enabled = true
@@ -411,9 +427,6 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         onEnd={handleInteractionEnd}
       />
 
-      {/* Ground plane (stages 0-3, fades out at stage 4) */}
-      <GroundPlane state={visibility.groundPlane} darkMode={darkMode} />
-
       {/* Drone (stages 0-2, 6) */}
       <Drone
         visible={visibility.drone}
@@ -434,12 +447,20 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         dronePositionRef={dronePositionRef}
         onFrustumClick={onFrustumClick}
       />
-      <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} />
+      <Suspense fallback={null}>
+        <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} />
+      </Suspense>
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} dronePositionRef={dronePositionRef} />
-      <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
-      <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
-      <FadeModel url={MODELS.mesh} state={visibility.mesh} />
+      <Suspense fallback={null}>
+        <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FadeModel url={MODELS.mesh} state={visibility.mesh} />
+      </Suspense>
     </>
   )
 }

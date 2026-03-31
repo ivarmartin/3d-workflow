@@ -46,9 +46,7 @@ export default function App() {
         style={{ width: '100%', height: '100%' }}
       >
         <color attach="background" args={[bgColor]} />
-        <Suspense fallback={null}>
-          <Scene visibility={visibility} darkMode={darkMode} onFrustumClick={handleFrustumClick} currentStage={currentStage} />
-        </Suspense>
+        <Scene visibility={visibility} darkMode={darkMode} onFrustumClick={handleFrustumClick} currentStage={currentStage} />
       </Canvas>
 
       {/* Loading overlay */}
