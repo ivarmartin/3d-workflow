@@ -7,7 +7,7 @@ const REVEAL_DURATION = 15 // seconds for all points to appear
 const WHITE_DURATION = 2   // seconds each point stays white before fading to color
 const POINT_SIZE = 2.5     // slightly larger than default
 
-export default function PointCloudRevealer({ url, state }) {
+export default function PointCloudRevealer({ url, state, fadeOutDuration = 0.75 }) {
   const { scene } = useGLTF(url)
   const groupRef = useRef()
   const progressRef = useRef(0)
@@ -174,7 +174,7 @@ export default function PointCloudRevealer({ url, state }) {
     } else if (state === 'fadeOut') {
       const opacity = mat.uniforms.uGlobalOpacity.value
       if (opacity > 0) {
-        mat.uniforms.uGlobalOpacity.value = Math.max(0, opacity - delta * 1.33)
+        mat.uniforms.uGlobalOpacity.value = Math.max(0, opacity - delta / fadeOutDuration)
       } else if (groupRef.current) {
         groupRef.current.visible = false
       }

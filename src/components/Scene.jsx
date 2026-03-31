@@ -46,6 +46,20 @@ const SPIRAL_DIVE_END = 0.15     // 0→3s: fly in close
 const SPIRAL_HOLD_END = 0.35     // 3→7s: hold close
 // 7→20s: spiral out
 
+// Smooth ease-in-out cubic
+const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+
+// Stage 9 flyover camera config
+const FLYOVER_APPROACH = 4       // seconds to reach start position
+const FLYOVER_FLIGHT = 10        // seconds to fly across
+const FLYOVER_CLIMB = 3          // seconds to climb to 45°
+const FLYOVER_TOTAL = FLYOVER_APPROACH + FLYOVER_FLIGHT + FLYOVER_CLIMB
+const FLYOVER_HEIGHT = 70        // camera height during flyover
+const FLYOVER_LOOK_AHEAD = 250   // how far ahead on ground the camera looks
+const FLYOVER_END_DIST = 900     // final orbit distance at 45°
+const FLYOVER_END_ELEV_DEG = 45  // final elevation in degrees
+const FLYOVER_CLIMB_ARC = Math.PI * 0.6  // rotate ~108° during climb for smooth turn
+
 // Profile view: drone hovers at this position, camera views from the side
 const PROFILE_DRONE_POS = new THREE.Vector3(-30, 100, -22)
 const PROFILE_SIDE_OFFSET = 60   // how far the viewer camera sits to the side
@@ -66,6 +80,17 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
   const spiralStartAngle = useRef(0)    // starting horizontal angle
   const spiralStartDist = useRef(0)     // starting distance from target
   const spiralStartElev = useRef(0)     // starting elevation angle
+  // Stage 9 flyover state
+  const flyoverRef = useRef(false)
+  const flyoverStartPosRef = useRef(new THREE.Vector3())
+  const flyoverStartTargetRef = useRef(new THREE.Vector3())
+  const flyoverFlightStartRef = useRef(new THREE.Vector3())
+  const flyoverFlightEndRef = useRef(new THREE.Vector3())
+  const flyoverFlightDirRef = useRef(new THREE.Vector3())
+  const flyoverEndPosRef = useRef(new THREE.Vector3())
+  const flyoverTempRef = useRef(new THREE.Vector3())
+  const flyoverClimbAngleRef = useRef(0)   // horizontal angle at climb start
+  const flyoverClimbHDistRef = useRef(0)   // horizontal distance at climb start
 
   useEffect(() => {
     if (!controlsRef.current) return
@@ -89,6 +114,11 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
     if (prev === 8 && spiralRef.current) {
       spiralRef.current = false
       animatingRef.current = false
+      if (controlsRef.current) controlsRef.current.enabled = true
+    }
+    // Stop flyover if leaving stage 9
+    if (prev === 9 && flyoverRef.current) {
+      flyoverRef.current = false
       if (controlsRef.current) controlsRef.current.enabled = true
     }
 
@@ -216,8 +246,51 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       controlsRef.current.autoRotate = false
       if (onSpiralStart) onSpiralStart()
       return // skip the standard animation setup
+    } else if (currentStage === 9) {
+      // Flyover: approach → fly across short axis → climb to orbit
+      const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
+      const shortDirX = Math.cos(shortAxisAngle)
+      const shortDirZ = Math.sin(shortAxisAngle)
+      const flyDist = MAP_HALF_ALONG * 0.6 // stay over the model
+      flyoverFlightStartRef.current.set(
+        MAP_CENTER[0] - shortDirX * flyDist,
+        FLYOVER_HEIGHT,
+        MAP_CENTER[2] - shortDirZ * flyDist
+      )
+      flyoverFlightEndRef.current.set(
+        MAP_CENTER[0] + shortDirX * flyDist,
+        FLYOVER_HEIGHT,
+        MAP_CENTER[2] + shortDirZ * flyDist
+      )
+      flyoverFlightDirRef.current.set(shortDirX, 0, shortDirZ)
+
+      flyoverStartPosRef.current.copy(camera.position)
+      flyoverStartTargetRef.current.copy(controlsRef.current.target)
+
+      // Compute climb arc start parameters from flight end position
+      const climbDx = flyoverFlightEndRef.current.x - MAP_CENTER[0]
+      const climbDz = flyoverFlightEndRef.current.z - MAP_CENTER[2]
+      flyoverClimbAngleRef.current = Math.atan2(climbDz, climbDx)
+      flyoverClimbHDistRef.current = Math.sqrt(climbDx * climbDx + climbDz * climbDz)
+
+      // Final climb position: 45° from MAP_CENTER, rotated by arc amount
+      const endElev = FLYOVER_END_ELEV_DEG * (Math.PI / 180)
+      const endAngle = flyoverClimbAngleRef.current + FLYOVER_CLIMB_ARC
+      const hDist = FLYOVER_END_DIST * Math.cos(endElev)
+      const camY = FLYOVER_END_DIST * Math.sin(endElev)
+      flyoverEndPosRef.current.set(
+        target.x + Math.cos(endAngle) * hDist,
+        camY,
+        target.z + Math.sin(endAngle) * hDist
+      )
+
+      flyoverRef.current = true
+      progressRef.current = 0
+      controlsRef.current.enabled = false
+      controlsRef.current.autoRotate = false
+      return
     }
-    // Stages 9, 10: no camera animation (free exploration)
+    // Stage 10: no camera animation (free exploration)
 
     if (goalPos) {
       startPosRef.current.copy(camera.position)
@@ -235,7 +308,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
   }, [currentStage, camera, size, controlsRef])
 
   useFrame((_, delta) => {
-    if (!animatingRef.current && !spiralRef.current) return
+    if (!animatingRef.current && !spiralRef.current && !flyoverRef.current) return
 
     const target = new THREE.Vector3(MAP_CENTER[0], MAP_CENTER[1], MAP_CENTER[2])
 
@@ -261,8 +334,6 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       let dist, elev
       const closeElev = SPIRAL_CLOSE_ELEV * (Math.PI / 180)
       const endElev = SPIRAL_END_ELEV * (Math.PI / 180)
-      // Smooth ease-in-out cubic
-      const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
 
       if (t < SPIRAL_DIVE_END) {
         // Dive in close
@@ -297,6 +368,76 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       return
     }
 
+    // Flyover animation (stage 9)
+    if (flyoverRef.current) {
+      progressRef.current += delta / FLYOVER_TOTAL
+      if (progressRef.current >= 1) {
+        progressRef.current = 1
+        flyoverRef.current = false
+        if (controlsRef.current) {
+          controlsRef.current.target.copy(target)
+          controlsRef.current.enabled = true
+          controlsRef.current.autoRotate = true
+          controlsRef.current.update()
+        }
+        return
+      }
+
+      const totalTime = progressRef.current * FLYOVER_TOTAL
+
+      if (totalTime < FLYOVER_APPROACH) {
+        // Phase 1: Approach — fly from current position to flight start
+        const t = easeInOut(totalTime / FLYOVER_APPROACH)
+        camera.position.lerpVectors(flyoverStartPosRef.current, flyoverFlightStartRef.current, t)
+        const lookTarget = flyoverTempRef.current.set(
+          flyoverFlightStartRef.current.x + flyoverFlightDirRef.current.x * FLYOVER_LOOK_AHEAD,
+          0,
+          flyoverFlightStartRef.current.z + flyoverFlightDirRef.current.z * FLYOVER_LOOK_AHEAD
+        )
+        controlsRef.current.target.lerpVectors(flyoverStartTargetRef.current, lookTarget, t)
+      } else if (totalTime < FLYOVER_APPROACH + FLYOVER_FLIGHT) {
+        // Phase 2: Flight — linear motion along the long axis
+        const t = (totalTime - FLYOVER_APPROACH) / FLYOVER_FLIGHT
+        camera.position.lerpVectors(flyoverFlightStartRef.current, flyoverFlightEndRef.current, t)
+        controlsRef.current.target.set(
+          camera.position.x + flyoverFlightDirRef.current.x * FLYOVER_LOOK_AHEAD,
+          0,
+          camera.position.z + flyoverFlightDirRef.current.z * FLYOVER_LOOK_AHEAD
+        )
+      } else {
+        // Phase 3: Arc + climb to 45° elevated view
+        const t = easeInOut((totalTime - FLYOVER_APPROACH - FLYOVER_FLIGHT) / FLYOVER_CLIMB)
+
+        // Arc around the model while climbing
+        const startAngle = flyoverClimbAngleRef.current
+        const angle = startAngle + FLYOVER_CLIMB_ARC * t
+
+        const endElevRad = FLYOVER_END_ELEV_DEG * (Math.PI / 180)
+        const endHDist = FLYOVER_END_DIST * Math.cos(endElevRad)
+        const endCamY = FLYOVER_END_DIST * Math.sin(endElevRad)
+
+        const hDist = flyoverClimbHDistRef.current + (endHDist - flyoverClimbHDistRef.current) * t
+        const camY = FLYOVER_HEIGHT + (endCamY - FLYOVER_HEIGHT) * t
+
+        camera.position.set(
+          MAP_CENTER[0] + Math.cos(angle) * hDist,
+          camY,
+          MAP_CENTER[2] + Math.sin(angle) * hDist
+        )
+
+        // Target smoothly transitions to MAP_CENTER
+        const flightEndTarget = flyoverTempRef.current.set(
+          flyoverFlightEndRef.current.x + flyoverFlightDirRef.current.x * FLYOVER_LOOK_AHEAD,
+          0,
+          flyoverFlightEndRef.current.z + flyoverFlightDirRef.current.z * FLYOVER_LOOK_AHEAD
+        )
+        controlsRef.current.target.lerpVectors(flightEndTarget, target, t)
+      }
+
+      controlsRef.current.update()
+      return
+    }
+
     // Standard linear animation
     progressRef.current += delta / animDurationRef.current
     if (progressRef.current >= 1) {
@@ -310,9 +451,8 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       }
     }
 
-    // Smooth ease-in-out
     const t = progressRef.current
-    const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+    const ease = easeInOut(t)
 
     camera.position.lerpVectors(startPosRef.current, goalPosRef.current, ease)
     if (controlsRef.current) {
@@ -358,6 +498,22 @@ export default function Scene({ visibility, darkMode, currentStage }) {
     }
     return () => {
       if (obliqueFadeTimerRef.current) clearTimeout(obliqueFadeTimerRef.current)
+    }
+  }, [currentStage])
+
+  // Stage 9 flyover: delay crossfade until approach completes (4s)
+  const [flyoverFadeReady, setFlyoverFadeReady] = useState(false)
+  const flyoverFadeTimerRef = useRef(null)
+  useEffect(() => {
+    if (currentStage === 9) {
+      setFlyoverFadeReady(false)
+      flyoverFadeTimerRef.current = setTimeout(() => setFlyoverFadeReady(true), FLYOVER_APPROACH * 1000)
+    } else {
+      setFlyoverFadeReady(false)
+      if (flyoverFadeTimerRef.current) clearTimeout(flyoverFadeTimerRef.current)
+    }
+    return () => {
+      if (flyoverFadeTimerRef.current) clearTimeout(flyoverFadeTimerRef.current)
     }
   }, [currentStage])
 
@@ -459,10 +615,23 @@ export default function Scene({ visibility, darkMode, currentStage }) {
         <ObliqueDrones url={MODELS.obliqueCameras} state={obliqueFadeOut ? 'fadeOut' : visibility.obliqueCameras} fadeDuration={2} />
       </Suspense>
       <Suspense fallback={null}>
-        <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
+        <PointCloudRevealer
+          url={MODELS.pointCloud}
+          state={
+            visibility.pointCloud === 'fadeOut'
+              ? (flyoverFadeReady ? 'fadeOut' : 'visible')
+              : (spiralStarted ? visibility.pointCloud : undefined)
+          }
+          fadeOutDuration={5}
+        />
       </Suspense>
       <Suspense fallback={null}>
-        <FadeModel url={MODELS.mesh} state={visibility.mesh} warmupId="mesh" />
+        <FadeModel
+          url={MODELS.mesh}
+          state={visibility.mesh === 'fadeIn' ? (flyoverFadeReady ? 'fadeIn' : undefined) : visibility.mesh}
+          fadeDuration={5}
+          warmupId="mesh"
+        />
       </Suspense>
     </>
   )
