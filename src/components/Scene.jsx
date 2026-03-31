@@ -369,8 +369,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
       if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)
       mapTimerRef.current = setTimeout(() => setMapReady(true), 2500)
-      // Nadir fadeout starts after map fade-in completes (2500ms + 750ms fade duration)
-      nadirTimerRef.current = setTimeout(() => setNadirHidden(true), 3250)
+      // Nadir fadeout starts when map fade-in begins so they cross-fade together
+      nadirTimerRef.current = setTimeout(() => setNadirHidden(true), 2500)
     } else {
       if (mapTimerRef.current) clearTimeout(mapTimerRef.current)
       if (nadirTimerRef.current) clearTimeout(nadirTimerRef.current)

@@ -62,7 +62,7 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
       clonedScene.traverse((child) => {
         if (child.isMesh) {
           child.material.opacity = opacityRef.current
-          child.material.depthWrite = opacityRef.current > 0.5
+          child.material.depthWrite = opacityRef.current > 0.99
         }
       })
     }
