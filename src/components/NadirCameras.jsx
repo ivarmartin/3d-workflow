@@ -78,14 +78,14 @@ export default function NadirCameras({ url, state, droneAnimating, droneHovering
         if (entry.opacity > 0) {
           entry.opacity = Math.max(0, entry.opacity - delta * FADE_SPEED)
           entry.mesh.material.opacity = entry.opacity
-          entry.mesh.material.depthWrite = entry.opacity > 0.5
+          entry.mesh.material.depthWrite = entry.opacity > 0.99
           entry.mesh.visible = entry.opacity > 0
         }
       } else if (entry.revealed && entry.opacity < 1) {
         // Animate opacity in
         entry.opacity = Math.min(1, entry.opacity + delta * FADE_SPEED)
         entry.mesh.material.opacity = entry.opacity
-        entry.mesh.material.depthWrite = entry.opacity > 0.5
+        entry.mesh.material.depthWrite = entry.opacity > 0.99
         entry.mesh.visible = true
       }
     }
