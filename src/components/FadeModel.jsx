@@ -21,7 +21,7 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
           ? overrideMaterial.clone()
           : child.material.clone()
         child.material.transparent = true
-        child.material.depthWrite = true
+        child.material.depthWrite = opacityRef.current > 0.99
         child.material.opacity = opacityRef.current
       }
     })
