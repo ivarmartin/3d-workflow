@@ -2,6 +2,7 @@ import { useState, useCallback, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Scene from './components/Scene'
 import StageUI from './components/StageUI'
+import SplashScreen from './components/SplashScreen'
 import InfoModal from './components/InfoModal'
 import { useStageManager } from './hooks/useStageManager'
 
@@ -9,6 +10,7 @@ const THUMB_BASE = `${import.meta.env.BASE_URL}assets/thumbs/`
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true)
+  const [splashVisible, setSplashVisible] = useState(true)
   const [infoOpen, setInfoOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
 
@@ -68,17 +70,24 @@ export default function App() {
         <div />
       </Suspense>
 
+      {/* Splash screen */}
+      {splashVisible && (
+        <SplashScreen darkMode={darkMode} onStart={() => setSplashVisible(false)} />
+      )}
+
       {/* UI overlays */}
-      <StageUI
-        currentStage={currentStage}
-        transitioning={transitioning}
-        isFirst={isFirst}
-        isLast={isLast}
-        goNext={goNext}
-        goBack={goBack}
-        darkMode={darkMode}
-        splatPlaceholder={visibility.splatPlaceholder}
-      />
+      {!splashVisible && (
+        <StageUI
+          currentStage={currentStage}
+          transitioning={transitioning}
+          isFirst={isFirst}
+          isLast={isLast}
+          goNext={goNext}
+          goBack={goBack}
+          darkMode={darkMode}
+          splatPlaceholder={visibility.splatPlaceholder}
+        />
+      )}
 
       <InfoModal
         darkMode={darkMode}

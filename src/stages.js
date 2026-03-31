@@ -1,8 +1,8 @@
 export const STAGES = [
   {
     id: 0,
-    name: "Let's make some spatial data!",
-    description: 'This interactive will show you how we turn drone photos into maps, point clouds, 3D-models and gaussian splats. Click "Next" to start the journey.',
+    name: 'Meet the Drone',
+    description: 'This is our survey drone. It will fly over the landscape capturing photos from different angles. Click "Next" to see how it works.',
   },
   {
     id: 1,

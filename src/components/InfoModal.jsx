@@ -73,6 +73,26 @@ export default function InfoModal({ darkMode, setDarkMode, infoOpen, setInfoOpen
         &#9776;
       </button>
 
+      {/* Ivar logo — below menu button */}
+      <a
+        href="https://ivar.studio"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          position: 'absolute',
+          top: 76,
+          right: 28,
+          zIndex: 10,
+          display: 'block',
+        }}
+      >
+        <img
+          src={`${import.meta.env.BASE_URL}assets/img/ivarlogo.png`}
+          alt="Ivar Studio"
+          style={{ width: 40, height: 40, objectFit: 'contain', display: 'block' }}
+        />
+      </a>
+
       {/* Modal overlay */}
       {infoOpen && (
         <div
