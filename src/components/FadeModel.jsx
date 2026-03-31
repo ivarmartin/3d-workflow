@@ -73,10 +73,8 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
     }
   })
 
-  if (!state) return null
-
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} visible={!!state && state !== 'hidden'}>
       <primitive object={clonedScene} />
     </group>
   )
