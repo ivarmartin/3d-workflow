@@ -2,54 +2,54 @@ import { useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 
 const vertexShader = `
-  varying vec2 vWorldXZ;
+  varying vec3 vWorldPosition;
   void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldXZ = worldPos.xz;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
 
 const fragmentShader = `
-  uniform vec3 groundColor;
+  uniform vec3 topColor;
   uniform vec3 horizonColor;
-  uniform float fadeStart;
-  uniform float fadeEnd;
-  varying vec2 vWorldXZ;
+  uniform float exponent;
+  varying vec3 vWorldPosition;
 
   float rand(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
   }
 
   void main() {
-    float dist = length(vWorldXZ);
-    float t = smoothstep(fadeStart, fadeEnd, dist);
-    vec3 color = mix(groundColor, horizonColor, t);
+    float h = normalize(vWorldPosition).y;
+    float t = max(pow(max(h, 0.0), exponent), 0.0);
+    vec3 color = mix(horizonColor, topColor, t);
     color += (rand(gl_FragCoord.xy) - 0.5) / 128.0;
     gl_FragColor = vec4(color, 1.0);
   }
 `
 
-export default function GroundPlane({ darkMode }) {
+export default function SkyDome({ darkMode }) {
   const uniforms = useMemo(() => ({
-    groundColor: { value: new THREE.Color() },
+    topColor: { value: new THREE.Color() },
     horizonColor: { value: new THREE.Color() },
-    fadeStart: { value: 1000 },
-    fadeEnd: { value: 4500 },
+    exponent: { value: 0.8 },
   }), [])
 
   useEffect(() => {
-    uniforms.groundColor.value.set(darkMode ? '#2a2a3e' : '#c8ccd4')
-    uniforms.horizonColor.value.set(darkMode ? '#1a1a2e' : '#e8eaef')
+    uniforms.topColor.value.set(darkMode ? '#020206' : '#87CEEB')
+    uniforms.horizonColor.value.set(darkMode ? '#303060' : '#e8eaef')
   }, [darkMode, uniforms])
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
-      <planeGeometry args={[10000, 10000]} />
+    <mesh renderOrder={-1}>
+      <sphereGeometry args={[4000, 32, 15]} />
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         uniforms={uniforms}
+        side={THREE.BackSide}
+        depthWrite={false}
       />
     </mesh>
   )

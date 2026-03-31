@@ -8,6 +8,7 @@ import NadirCameras from './NadirCameras'
 import ObliqueDrones from './ObliqueDrones'
 import PointCloudRevealer from './PointCloudRevealer'
 import ScaleBar3D from './ScaleBar3D'
+import SkyDome from './SkyDome'
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
 
@@ -564,6 +565,9 @@ export default function Scene({ visibility, darkMode, currentStage }) {
 
   return (
     <>
+      {/* Environment */}
+      <SkyDome darkMode={darkMode} />
+
       {/* Lighting */}
       <ambientLight intensity={darkMode ? 0.6 : 1.0} />
       <directionalLight
