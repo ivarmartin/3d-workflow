@@ -36,18 +36,18 @@ export const STAGES = [
   },
   {
     id: 7,
-    name: 'Oblique Cameras',
-    description: 'Additional oblique camera angles for 3D reconstruction',
+    name: 'Additional Oblique Flights',
+    description: 'So now our drone is flying 4 additional grid patterns: capturing 45-degree angle from four different directions. That gives us a lot more data about the terrain.',
   },
   {
     id: 8,
-    name: 'Point Cloud',
-    description: 'Dense 3D point cloud from structure-from-motion',
+    name: 'Point Cloud Generation',
+    description: 'The first step for most 3D-models is to generate a point cloud. This process takes all of our nadir and oblique images and calculates points in 3D space that represent our scanned landscape.',
   },
   {
     id: 9,
-    name: 'Mesh',
-    description: 'Textured 3D mesh reconstructed from the point cloud',
+    name: 'Making a Mesh',
+    description: 'From the point cloud we can make a solid form by combining all the points into thousands or millions of tiny triangles. This becomes what we call a Mesh.',
   },
   {
     id: 10,
