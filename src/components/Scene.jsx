@@ -324,7 +324,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
   return null
 }
 
-export default function Scene({ visibility, darkMode, onFrustumClick, currentStage }) {
+export default function Scene({ visibility, darkMode, currentStage }) {
   const controlsRef = useRef()
   const idleTimerRef = useRef(null)
   const dronePositionRef = useRef(null)
@@ -447,7 +447,8 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         droneAnimating={visibility.droneAnimating}
         droneHovering={visibility.droneHovering}
         dronePositionRef={dronePositionRef}
-        onFrustumClick={onFrustumClick}
+        currentStage={currentStage}
+        darkMode={darkMode}
       />
       <Suspense fallback={null}>
         <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} warmupId="map" />
