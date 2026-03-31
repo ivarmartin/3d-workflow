@@ -450,7 +450,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         onFrustumClick={onFrustumClick}
       />
       <Suspense fallback={null}>
-        <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} />
+        <FadeModel url={MODELS.map} state={mapReady ? visibility.map : undefined} fadeDuration={visibility.map === 'fadeOut' ? 1 : 0.75} warmupId="map" />
       </Suspense>
       <ScaleBar3D state={mapReady ? visibility.map : undefined} />
       <CameraAnimator controlsRef={controlsRef} currentStage={currentStage} onSpiralStart={handleSpiralStart} dronePositionRef={dronePositionRef} />
@@ -461,7 +461,7 @@ export default function Scene({ visibility, darkMode, onFrustumClick, currentSta
         <PointCloudRevealer url={MODELS.pointCloud} state={spiralStarted ? visibility.pointCloud : (visibility.pointCloud === 'fadeOut' ? 'fadeOut' : undefined)} />
       </Suspense>
       <Suspense fallback={null}>
-        <FadeModel url={MODELS.mesh} state={visibility.mesh} />
+        <FadeModel url={MODELS.mesh} state={visibility.mesh} warmupId="mesh" />
       </Suspense>
     </>
   )

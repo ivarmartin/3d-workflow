@@ -2,10 +2,11 @@ import { useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { useGpuWarmup, WARMUP_FRAME_THRESHOLD } from '../hooks/useGpuWarmup'
 
 const FADE_DURATION = 0.75 // seconds
 
-export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, overrideMaterial }) {
+export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, overrideMaterial, warmupId }) {
   // state: 'visible', 'fadeIn', 'fadeOut', or undefined (hidden)
   const { scene } = useGLTF(url)
   const groupRef = useRef()
@@ -54,7 +55,19 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
     }
   }, [state, clonedScene])
 
+  const warmupFrameRef = useRef(0)
+  const warmupDoneRef = useRef(false)
+
   useFrame((_, delta) => {
+    // GPU warmup tracking — count frames while visible at opacity 0
+    if (warmupId && !warmupDoneRef.current && groupRef.current?.visible) {
+      warmupFrameRef.current++
+      if (warmupFrameRef.current >= WARMUP_FRAME_THRESHOLD) {
+        useGpuWarmup.getState().markWarmed(warmupId)
+        warmupDoneRef.current = true
+      }
+    }
+
     if (!state) return
 
     const speed = 1 / fadeDuration

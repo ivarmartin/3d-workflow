@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import LoadingRings from './LoadingRings'
 
 export default function SplashScreen({ darkMode, onStart }) {
   const [visible, setVisible] = useState(true)
@@ -108,6 +109,10 @@ export default function SplashScreen({ darkMode, onStart }) {
       >
         Start
       </button>
+
+      <div style={{ marginTop: 16, height: 80, display: 'flex', justifyContent: 'center' }}>
+        <LoadingRings size={80} darkMode={darkMode} />
+      </div>
     </div>
   )
 }

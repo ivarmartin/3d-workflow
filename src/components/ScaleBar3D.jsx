@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
+import { useGpuWarmup, WARMUP_FRAME_THRESHOLD } from '../hooks/useGpuWarmup'
 
 // Map geometry constants (matching Drone.jsx / Scene.jsx)
 const MAP_CENTER_X = -17
@@ -30,8 +31,23 @@ export default function ScaleBar3D({ state }) {
   const worldX = MAP_CENTER_X + localU * cos - localV * sin
   const worldZ = MAP_CENTER_Z + localU * sin + localV * cos
 
+  const warmupFrameRef = useRef(0)
+  const warmupDoneRef = useRef(false)
+
   useFrame((_, delta) => {
     if (!groupRef.current) return
+
+    // GPU warmup tracking — keep visible at opacity 0 for first few frames
+    if (!warmupDoneRef.current) {
+      warmupFrameRef.current++
+      if (warmupFrameRef.current < WARMUP_FRAME_THRESHOLD) {
+        // Keep visible during warmup so GPU compiles shaders
+        if (!groupRef.current.visible) groupRef.current.visible = true
+        return
+      }
+      useGpuWarmup.getState().markWarmed('scaleBar')
+      warmupDoneRef.current = true
+    }
 
     if (!state) {
       // Keep mounted for pre-warming but ensure hidden

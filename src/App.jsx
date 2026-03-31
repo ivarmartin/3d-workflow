@@ -1,10 +1,13 @@
 import { useState, useCallback, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { useProgress } from '@react-three/drei'
 import Scene from './components/Scene'
 import StageUI from './components/StageUI'
 import SplashScreen from './components/SplashScreen'
+import LoadingRings from './components/LoadingRings'
 import InfoModal from './components/InfoModal'
 import { useStageManager } from './hooks/useStageManager'
+import { useGpuWarmup } from './hooks/useGpuWarmup'
 
 const THUMB_BASE = `${import.meta.env.BASE_URL}assets/thumbs/`
 
@@ -23,6 +26,11 @@ export default function App() {
     isFirst,
     isLast,
   } = useStageManager()
+
+  const downloadProgress = useProgress((s) => s.progress)
+  const downloadActive = useProgress((s) => s.active)
+  const allWarmed = useGpuWarmup((s) => Object.values(s.warmupStatus).every(Boolean))
+  const loadingComplete = downloadProgress >= 100 && !downloadActive && allWarmed
 
   const handleFrustumClick = useCallback((name) => {
     if (currentStage !== 3) return
@@ -85,6 +93,13 @@ export default function App() {
           darkMode={darkMode}
           splatPlaceholder={visibility.splatPlaceholder}
         />
+      )}
+
+      {/* In-app loading indicator (visible if user dismissed splash before loading finished) */}
+      {!splashVisible && !loadingComplete && (
+        <div style={{ position: 'absolute', top: 76, left: 28, zIndex: 10 }}>
+          <LoadingRings size={48} darkMode={darkMode} />
+        </div>
       )}
 
       <InfoModal
