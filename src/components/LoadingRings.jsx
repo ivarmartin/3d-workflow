@@ -34,6 +34,7 @@ export default function LoadingRings({ size = 80, darkMode }) {
   const trackColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'
   const textColor = darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'
 
+
   const outerOffset = OUTER_CIRC * (1 - progress / 100)
   const innerOffset = INNER_CIRC * (1 - gpuProgress / 100)
 

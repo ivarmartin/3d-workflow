@@ -10,11 +10,11 @@ const MAP_HALF_ALONG = 375
 const MAP_HALF_ACROSS = 133
 const MAP_ANGLE = 136 * (Math.PI / 180)
 
-const BAR_LENGTH = 120 // 120 meters
+const BAR_LENGTH = 100 // 100 meters
 const BAR_HEIGHT = 1.5
 const BAR_THICKNESS = 0.5
 const ENDCAP_HEIGHT = 4
-const Y_OFFSET = 3 // slightly above ground to avoid z-fighting
+const Y_OFFSET = 5 // raised above map to stay visible at low camera angles
 
 const FADE_DURATION = 0.75
 
@@ -26,8 +26,8 @@ export default function ScaleBar3D({ state }) {
   const cos = Math.cos(MAP_ANGLE)
   const sin = Math.sin(MAP_ANGLE)
   // Place at ~80% along and ~80% across (bottom-right when viewed top-down)
-  const localU = MAP_HALF_ACROSS * 0.7
-  const localV = -MAP_HALF_ALONG * 0.75
+  const localU = MAP_HALF_ACROSS * 0.85
+  const localV = -MAP_HALF_ALONG * 0.95
   const worldX = MAP_CENTER_X + localU * cos - localV * sin
   const worldZ = MAP_CENTER_Z + localU * sin + localV * cos
 
@@ -143,7 +143,7 @@ export default function ScaleBar3D({ state }) {
         material-transparent
         material-depthWrite={false}
       >
-        120 m
+        100 m
       </Text>
     </group>
   )

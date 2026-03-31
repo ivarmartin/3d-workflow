@@ -153,7 +153,7 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
 
     } else if (currentStage === 5) {
       // Flat plane view — near side-on (~10° elevation)
-      const elevAngle = 10 * (Math.PI / 180)
+      const elevAngle = 5 * (Math.PI / 180)
       const distance = 1200
 
       const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
@@ -421,8 +421,8 @@ export default function Scene({ visibility, darkMode, currentStage }) {
         target={SCENE_CENTER}
         enableDamping
         dampingFactor={0.05}
-        minDistance={50}
-        maxDistance={2000}
+        minDistance={100}
+        maxDistance={1000}
         autoRotate
         autoRotateSpeed={0.3}
         onStart={handleInteractionStart}
