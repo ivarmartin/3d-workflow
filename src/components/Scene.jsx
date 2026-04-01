@@ -9,6 +9,7 @@ import ObliqueDrones from './ObliqueDrones'
 import PointCloudRevealer from './PointCloudRevealer'
 import ScaleBar3D from './ScaleBar3D'
 import SkyDome from './SkyDome'
+import { isIOS } from '../utils/platform'
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/`
 
@@ -20,8 +21,12 @@ const MODELS = {
   mesh: `${ASSET_BASE}260321-Sanda-3D_mesh.glb`,
 }
 
-// Preload all GLBs
-Object.values(MODELS).forEach((url) => useGLTF.preload(url))
+// Preload lightweight GLBs immediately; defer the heavy 28MB mesh
+// to reduce peak memory on iOS (WebKit has strict GPU memory limits)
+useGLTF.preload(MODELS.nadirCameras)
+useGLTF.preload(MODELS.map)
+useGLTF.preload(MODELS.obliqueCameras)
+useGLTF.preload(MODELS.pointCloud)
 
 // Scene center (2D map center)
 const SCENE_CENTER = [-30, 4, -22]
@@ -496,6 +501,15 @@ export default function Scene({ visibility, darkMode, currentStage }) {
   // Fade out nadir cameras after map has fully faded in at stage 4
   const [nadirHidden, setNadirHidden] = useState(false)
   const nadirTimerRef = useRef(null)
+  // Defer mounting the heavy 28MB mesh until close to when it's needed (stage 8+).
+  // On non-iOS, mount earlier to allow GPU warmup; once mounted, keep mounted.
+  const [meshMounted, setMeshMounted] = useState(false)
+  useEffect(() => {
+    if (!meshMounted && currentStage >= (isIOS ? 9 : 0)) {
+      setMeshMounted(true)
+    }
+  }, [currentStage, meshMounted])
+
   // Spiral-dependent states: point cloud waits for spiral, oblique cameras fade 5s in
   const [spiralStarted, setSpiralStarted] = useState(false)
   const [obliqueFadeOut, setObliqueFadeOut] = useState(false)
@@ -632,24 +646,29 @@ export default function Scene({ visibility, darkMode, currentStage }) {
         />
       </Suspense>
       {/* Solid (untextured) mesh — fades in at stage 9, fades out at stage 10 */}
-      <Suspense fallback={null}>
-        <FadeModel
-          url={MODELS.mesh}
-          state={visibility.meshSolid}
-          fadeDuration={visibility.meshSolid === 'fadeIn' ? 10 : 4}
-          overrideMaterial={SANDY_BROWN_MATERIAL}
-          warmupId="mesh"
-        />
-      </Suspense>
-      {/* Textured mesh — fades in during stage 10 approach, done before flight */}
-      <Suspense fallback={null}>
-        <FadeModel
-          url={MODELS.mesh}
-          state={visibility.meshTextured}
-          fadeDuration={4}
-          warmupId="meshTextured"
-        />
-      </Suspense>
+      {/* Deferred on iOS to reduce peak GPU memory; loaded on-demand at stage 9+ */}
+      {meshMounted && (
+        <>
+          <Suspense fallback={null}>
+            <FadeModel
+              url={MODELS.mesh}
+              state={visibility.meshSolid}
+              fadeDuration={visibility.meshSolid === 'fadeIn' ? 10 : 4}
+              overrideMaterial={SANDY_BROWN_MATERIAL}
+              warmupId="mesh"
+            />
+          </Suspense>
+          {/* Textured mesh — fades in during stage 10 approach, done before flight */}
+          <Suspense fallback={null}>
+            <FadeModel
+              url={MODELS.mesh}
+              state={visibility.meshTextured}
+              fadeDuration={4}
+              warmupId="meshTextured"
+            />
+          </Suspense>
+        </>
+      )}
     </>
   )
 }

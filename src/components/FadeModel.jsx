@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGpuWarmup, WARMUP_FRAME_THRESHOLD } from '../hooks/useGpuWarmup'
+import { isIOS } from '../utils/platform'
 
 const FADE_DURATION = 0.75 // seconds
 
@@ -43,9 +44,19 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
       })
     } else if (!state) {
       opacityRef.current = 0
-      // Keep group visible at opacity 0 so GPU compiles shaders and uploads
-      // textures on mount — avoids a frame stall on first real fade-in
-      if (groupRef.current) groupRef.current.visible = true
+      if (isIOS) {
+        // On iOS, hide fully to avoid loading textures into constrained VRAM
+        if (groupRef.current) groupRef.current.visible = false
+        // Auto-mark warmup as done since we're skipping it
+        if (warmupId && !warmupDoneRef.current) {
+          useGpuWarmup.getState().markWarmed(warmupId)
+          warmupDoneRef.current = true
+        }
+      } else {
+        // Keep group visible at opacity 0 so GPU compiles shaders and uploads
+        // textures on mount — avoids a frame stall on first real fade-in
+        if (groupRef.current) groupRef.current.visible = true
+      }
       clonedScene.traverse((child) => {
         if (child.isMesh) {
           child.material.opacity = 0
@@ -54,6 +65,18 @@ export default function FadeModel({ url, state, fadeDuration = FADE_DURATION, ov
       })
     }
   }, [state, clonedScene])
+
+  // Dispose cloned materials and geometries on unmount to free VRAM
+  useEffect(() => {
+    return () => {
+      clonedScene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.dispose()
+          child.geometry.dispose()
+        }
+      })
+    }
+  }, [clonedScene])
 
   const warmupFrameRef = useRef(0)
   const warmupDoneRef = useRef(false)

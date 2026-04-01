@@ -9,6 +9,10 @@ import InfoModal from './components/InfoModal'
 import { useStageManager } from './hooks/useStageManager'
 import { useGpuWarmup } from './hooks/useGpuWarmup'
 
+import { isIOS, isMobile } from './utils/platform'
+
+const maxDpr = isIOS ? 1.5 : (isMobile ? 2 : 2)
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(true)
   const [splashVisible, setSplashVisible] = useState(true)
@@ -40,7 +44,12 @@ export default function App() {
           near: 0.1,
           far: 5000,
         }}
-        gl={{ antialias: true }}
+        dpr={[1, maxDpr]}
+        gl={{
+          antialias: !isMobile,
+          powerPreference: 'high-performance',
+          ...(isIOS && { precision: 'mediump' }),
+        }}
         style={{ width: '100%', height: '100%' }}
       >
         <color attach="background" args={[bgColor]} />
