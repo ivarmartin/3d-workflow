@@ -180,6 +180,17 @@ export default function ObliqueDrones({ url, state, fadeDuration = 2 }) {
     return { clonedScene: clone, cameraGroups: groups, flights: flightData }
   }, [scene])
 
+  // Dispose cloned materials on unmount to free VRAM
+  useEffect(() => {
+    return () => {
+      clonedScene.traverse((child) => {
+        if (child.isMesh) {
+          child.material.dispose()
+        }
+      })
+    }
+  }, [clonedScene])
+
   const staggerTimeRef = useRef(0) // time since fadeIn started
   const prevActiveCountRef = useRef(0)
 

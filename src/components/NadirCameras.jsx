@@ -48,6 +48,15 @@ export default function NadirCameras({ url, state, droneAnimating, droneHovering
     return { clonedScene: clone, meshes: meshList, hitRadius: radius }
   }, [scene])
 
+  // Dispose cloned materials on unmount to free VRAM
+  useEffect(() => {
+    return () => {
+      for (const entry of meshes) {
+        entry.mesh.material.dispose()
+      }
+    }
+  }, [meshes])
+
   const hitSphereGeo = useMemo(() => new THREE.SphereGeometry(hitRadius, 8, 6), [hitRadius])
   const hitSphereMat = useMemo(() => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }), [])
 
