@@ -267,48 +267,47 @@ function CameraAnimator({ controlsRef, currentStage, onSpiralStart, dronePositio
       autoRotateAfter = true
 
     } else if (currentStage === 10) {
-      // Texturing flyover: approach → fly across short axis → climb to orbit
-      const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
-      const shortDirX = Math.cos(shortAxisAngle)
-      const shortDirZ = Math.sin(shortAxisAngle)
-      const flyDist = MAP_HALF_ALONG * 0.6 // stay over the model
-      flyoverFlightStartRef.current.set(
-        MAP_CENTER[0] - shortDirX * flyDist,
-        FLYOVER_HEIGHT,
-        MAP_CENTER[2] - shortDirZ * flyDist
-      )
-      flyoverFlightEndRef.current.set(
-        MAP_CENTER[0] + shortDirX * flyDist,
-        FLYOVER_HEIGHT,
-        MAP_CENTER[2] + shortDirZ * flyDist
-      )
-      flyoverFlightDirRef.current.set(shortDirX, 0, shortDirZ)
+      // Texturing: same angled top-down view as stage 9 with auto-rotate.
+      // Resets camera to fixed altitude/angle even if user moved it.
+      const dx = camera.position.x - target.x
+      const dz = camera.position.z - target.z
+      const currentAngle = Math.atan2(dz, dx)
 
-      flyoverStartPosRef.current.copy(camera.position)
-      flyoverStartTargetRef.current.copy(controlsRef.current.target)
-
-      // Compute climb arc start parameters from flight end position
-      const climbDx = flyoverFlightEndRef.current.x - MAP_CENTER[0]
-      const climbDz = flyoverFlightEndRef.current.z - MAP_CENTER[2]
-      flyoverClimbAngleRef.current = Math.atan2(climbDz, climbDx)
-      flyoverClimbHDistRef.current = Math.sqrt(climbDx * climbDx + climbDz * climbDz)
-
-      // Final climb position: 45° from MAP_CENTER, rotated by arc amount
       const endElev = FLYOVER_END_ELEV_DEG * (Math.PI / 180)
-      const endAngle = flyoverClimbAngleRef.current + FLYOVER_CLIMB_ARC
       const hDist = FLYOVER_END_DIST * Math.cos(endElev)
       const camY = FLYOVER_END_DIST * Math.sin(endElev)
-      flyoverEndPosRef.current.set(
-        target.x + Math.cos(endAngle) * hDist,
-        camY,
-        target.z + Math.sin(endAngle) * hDist
-      )
 
-      flyoverRef.current = true
-      progressRef.current = 0
-      controlsRef.current.enabled = false
-      controlsRef.current.autoRotate = false
-      return
+      goalPos = new THREE.Vector3(
+        target.x + Math.cos(currentAngle) * hDist,
+        camY,
+        target.z + Math.sin(currentAngle) * hDist
+      )
+      goalTarget = target.clone()
+      duration = 2.0
+      autoRotateAfter = true
+
+      // NOTE: Flyover animation code kept for potential future use.
+      // To re-enable, replace this block with the flyover setup logic:
+      // const shortAxisAngle = MAP_ANGLE_RAD + Math.PI / 2
+      // const shortDirX = Math.cos(shortAxisAngle)
+      // const shortDirZ = Math.sin(shortAxisAngle)
+      // const flyDist = MAP_HALF_ALONG * 0.6
+      // flyoverFlightStartRef.current.set(...)
+      // flyoverFlightEndRef.current.set(...)
+      // flyoverFlightDirRef.current.set(shortDirX, 0, shortDirZ)
+      // flyoverStartPosRef.current.copy(camera.position)
+      // flyoverStartTargetRef.current.copy(controlsRef.current.target)
+      // const climbDx = flyoverFlightEndRef.current.x - MAP_CENTER[0]
+      // const climbDz = flyoverFlightEndRef.current.z - MAP_CENTER[2]
+      // flyoverClimbAngleRef.current = Math.atan2(climbDz, climbDx)
+      // flyoverClimbHDistRef.current = Math.sqrt(climbDx * climbDx + climbDz * climbDz)
+      // const endAngle = flyoverClimbAngleRef.current + FLYOVER_CLIMB_ARC
+      // flyoverEndPosRef.current.set(target.x + Math.cos(endAngle) * hDist, camY, target.z + Math.sin(endAngle) * hDist)
+      // flyoverRef.current = true
+      // progressRef.current = 0
+      // controlsRef.current.enabled = false
+      // controlsRef.current.autoRotate = false
+      // return
     }
     // Stage 11: no camera animation (free exploration)
 
